@@ -102,5 +102,7 @@ adder_tb.add_config(name="data_width_16", generics={"DATA_WIDTH": 16})
 ```
 Notice how the adder_tb can have configurations with different generics added to it, much like a normal testbench.
 
+With Riviera-PRO, a list or tuple given as the value of a generic becomes an aggregate, e.g. `["FOO", "BAR"]` becomes `(FOO,BAR)`. Generics of a VHDL top level are otherwise passed to the simulator as written, as with VUnit, so they are written as VHDL: `"FOO"` for an enumeration literal, `'x"00FF"'`, `"(FOO,BAR)"`, and quotes are only added to values containing spaces. Strings given to a Verilog top level are quoted, as Riviera-PRO needs for string parameters.
+
 Now you're all set. Run your run.py script like you would any vuint run script.
 
