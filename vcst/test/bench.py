@@ -1,25 +1,32 @@
-import os
-import sys
-import types
-
-from pathlib import Path
+import inspect
 from collections import OrderedDict
-from importlib.machinery import SourceFileLoader
 from dataclasses import dataclass
 
-from cocotb.decorators import test as Test
-from ..decorators import test as vcst_Test
-
 from vunit.test.bench import TestBench, TestConfigurationVisitor, FileLocation
-from vunit.configuration import ConfigurationVisitor, Configuration, DEFAULT_NAME
+from vunit.test.list import TestList
+from vunit.configuration import Configuration, DEFAULT_NAME
 
 from .suites import IndependentCocoSimTestCase
-from ..utils.mod_utils import import_mod
+from ..utils.compat import find_cocotb_tests
+
+# VUnit 5 gives each test a seed and passes it to create_tests before elaborate_only
+_VUNIT_HAS_SEEDS = "seed" in inspect.signature(TestBench.create_tests).parameters
+
+def _split_create_tests_args(args):
+    """Returns (seed, elaborate_only, test_list) from the arguments VUnit gives create_tests after simulator_if."""
+    if _VUNIT_HAS_SEEDS:
+        seed, elaborate_only, test_list = (list(args) + [None] * 3)[:3]
+        if seed == "repeat":
+            # VCST keeps no test history to repeat seeds from, so a new seed is generated
+            seed = None
+    else:
+        seed = None
+        elaborate_only, test_list = (list(args) + [None] * 2)[:2]
+    return seed, elaborate_only, test_list
 
 class CocoTestBench(TestBench):
     def __init__(self, design_unit, cocotb_module, cocotb_module_location, database=None):
-        
-        ConfigurationVisitor.__init__(self)
+        # ConfigurationVisitor.__init__ differs between VUnit versions, so set its attribute directly
         self.design_unit = design_unit
         self._database = database
 
@@ -42,24 +49,23 @@ class CocoTestBench(TestBench):
         Called when architectures have been added
         """
         self._check_architectures(self.design_unit)
-        
+
     def discover_cocotb_tests(self, cocotb_module, cocotb_module_location):
         """
-        Discover tests defined in a cocotb module and 
+        Discover tests defined in a cocotb module and
         """
-        self._cocotb_module = cocotb_module        
+        self._cocotb_module = cocotb_module
         tests = []
         #Iterate every value in the module looking for cocotb tests
-        for obj_name in dir(cocotb_module):
-            obj = getattr(cocotb_module, obj_name)
-            if isinstance(obj, Test):
-                coco_test = CocoTest(obj.__name__, self.design_unit, cocotb_module, cocotb_module_location)
-                if isinstance(obj, vcst_Test):
-                    for attr in obj.attributes:
-                        coco_test.add_attribute(CocoTestAttribute(attr, None))
+        for obj, test_names in find_cocotb_tests(cocotb_module):
+            for test_name in test_names:
+                coco_test = CocoTest(test_name.name, self.design_unit, cocotb_module, cocotb_module_location,
+                                     result_name=test_name.result_name)
+                for attr in getattr(obj, "vcst_attributes", []):
+                    coco_test.add_attribute(CocoTestAttribute(attr, None))
                 tests.append(coco_test)
 
-        default_config = Configuration(DEFAULT_NAME, self.design_unit)                  
+        default_config = Configuration(DEFAULT_NAME, self.design_unit)
         self._test_cases = [
             CocoTestConfigurationVisitor(test, self.design_unit, True, default_config.copy())
             for test in tests
@@ -67,18 +73,19 @@ class CocoTestBench(TestBench):
 
         self._configs = OrderedDict({default_config.name: default_config})
 
-    def create_tests(self, simulator_if, elaborate_only, test_list=None):
+    def create_tests(self, simulator_if, *args, **kwargs):
         """
         Create all test cases from this test bench
         """
 
         self._check_architectures(self.design_unit)
 
+        seed, elaborate_only, test_list = _split_create_tests_args(args)
         if test_list is None:
             test_list = TestList()
 
         for test_case in self._test_cases:
-            test_case.create_tests(simulator_if, elaborate_only, test_list)
+            test_case.create_coco_tests(simulator_if, seed, elaborate_only, test_list)
 
         return test_list
 
@@ -88,8 +95,9 @@ class CocoTest(object):
     TODO: Describe
     """
 
-    def __init__(self, name, design_unit, cocotb_module, cocotb_module_location):
+    def __init__(self, name, design_unit, cocotb_module, cocotb_module_location, result_name=None):
         self._name = name
+        self._result_name = name if result_name is None else result_name
         self._top_level = cocotb_module.top_level
         self._vhdl = design_unit.is_entity
         self._location = FileLocation(design_unit.file_name, None, None, None) #offset, length, lineno set to None
@@ -100,6 +108,11 @@ class CocoTest(object):
     @property
     def name(self):
         return self._name
+
+    @property
+    def result_name(self):
+        """The name of the test in the cocotb results file"""
+        return self._result_name
 
     @property
     def location(self):
@@ -137,7 +150,11 @@ class CocoTestConfigurationVisitor(TestConfigurationVisitor):
     """
     Override VUnit's TestConfigurationVisitor to create CocoIndependentSimTestCase objects
     """
-    def create_tests(self, simulator_if, elaborate_only, test_list=None):
+    def create_tests(self, simulator_if, *args, **kwargs):
+        seed, elaborate_only, test_list = _split_create_tests_args(args)
+        self.create_coco_tests(simulator_if, seed, elaborate_only, test_list)
+
+    def create_coco_tests(self, simulator_if, seed, elaborate_only, test_list):
         for config in self._get_configurations_to_run():
             test_list.add_test(
                 IndependentCocoSimTestCase(
@@ -145,12 +162,12 @@ class CocoTestConfigurationVisitor(TestConfigurationVisitor):
                     config=config,
                     simulator_if=simulator_if,
                     elaborate_only=elaborate_only,
+                    seed=seed,
                 )
-            )        
+            )
 
 
-@dataclass
+@dataclass(frozen=True)
 class CocoTestAttribute:
     name: str
     value: str
-

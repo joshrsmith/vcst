@@ -1,3 +1,3 @@
+from . import environment
 from . import rivierapro
-from . import modelsim
-from . import ghdl
+from . import vsim

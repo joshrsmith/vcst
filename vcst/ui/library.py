@@ -1,17 +1,17 @@
 import logging
 from vunit.ui.library import Library
 from ..test.bench import CocoTestBench
-from ..utils.mod_utils import import_mod
 
 LOGGER = logging.getLogger(__name__)
 
 
 class VCSTLibrary(Library):
-    
-    def add_cocotb_testbench(self, design_unit, cocotb_module_locations, cocotb_module=None):
+
+    def add_cocotb_testbench(self, design_unit, cocotb_module, cocotb_module_location):
         """
+        Adds a test bench running the tests of cocotb_module with design_unit as top level.
         """
-        test_bench = CocoTestBench(design_unit, cocotb_module_locations, cocotb_module, database=None)
+        test_bench = CocoTestBench(design_unit, cocotb_module, cocotb_module_location, database=None)
         self._test_bench_list._add_test_bench(test_bench)
         return self.test_bench(design_unit.name)
 
@@ -40,8 +40,6 @@ class VCSTLibrary(Library):
             raise KeyError(name)
 
         if test_bench:
-            return self.test_bench(name)        
+            return self.test_bench(name)
 
         return library.modules[name]
-
-        

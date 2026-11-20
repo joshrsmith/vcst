@@ -11,7 +11,10 @@ VCST seeks to combine the best of both worlds. This includes inheriting VUnit's 
 The goal of VCST is to provide a proof of example concept of VUnit and Cocotb working together without a single source change to other project. This will provide a couple of benefits. First, it is an interim solutions for VUnit and Cocotb users. Second, it will shed some light on what works could be done to make cooctb and vunit even more modular. Third, it has given me an opportunity to dig more into how these tools work so I can contribute more to these amazing tools.
 
 ## Simulator Support
-At the moment, the only simulators supported are GHDL and Riviera-Pro. GHDL has very limited support for VPI and therefore Cocotb can't fully utilize it. I will make attempts for supporting ModelSim/Questa as well. I invite anyone who wants to help me broaden simulator support to contribute. I also intend to add support for Icarus as well. This is bigger effort as VUnit does not support Icarus (as it does not support enough of System Verilog). VUnit's SystemVerilog testbenches would not work, but cocotb testbenches could work. 
+At the moment, the supported simulators are GHDL, Riviera-Pro and ModelSim/Questa. The tests in this repository are run with GHDL; Riviera-Pro and ModelSim/Questa have not been tested with the current versions of VUnit and cocotb. GHDL has very limited support for VPI and therefore Cocotb can't fully utilize it. I invite anyone who wants to help me broaden simulator support to contribute. I also intend to add support for Icarus as well. This is bigger effort as VUnit does not support Icarus (as it does not support enough of System Verilog). VUnit's SystemVerilog testbenches would not work, but cocotb testbenches could work. 
+
+## Supported Versions
+VCST works with cocotb 1.8 and 1.9, and with VUnit 4.7.1 or later, including the upcoming VUnit 5. With VUnit 5, which needs Python 3.11 or later, cocotb 1.8 can be used with Python 3.11 and 3.12. Use VCST 0.0.11 or earlier with cocotb before 1.8 or VUnit before 4.7.
 
 ## Disadvantages
 There are a few disadvantages compared to use either VUnit or Cocotb by themselves. These include:
@@ -45,6 +48,8 @@ from vcst import VCST
 ui = VCST.from_argv()
 ```
 
+Like VUnit before version 5, VCST adds VUnit's VHDL builtins by default. Pass `compile_builtins=False` to `from_argv` or `from_args` to leave them out, for example in order to call `ui.add_vhdl_builtins()` with arguments of your own.
+
 Now to import a cocotb test module there are two steps. The cocotb module itself must call the set_top_level function defined in VCST. The set_top_level function takes in three arguments:
 1. top_level_name - Top level entity or module that this cocotb tests.
 2. top_level_type - "entity" if VHDL, "module" if verilog.
@@ -77,6 +82,8 @@ async def reset_test(dut):
 set_top_level("counter", "entity", "lib") #This is different than a normal cocotb testbench
 
 ```
+
+Tests decorated with `@vcst.test(attributes=[".my_attribute"])` instead of `@cocotb.test()` get VUnit attributes, which can be used to select tests with the `--with-attributes` and `--without-attributes` options. With VUnit 5, the seed VUnit gives a test (see `--seed`) is also used as the cocotb random seed.
 
 Once that is defined, the cocotb module can be added via the ui object.
 ```python

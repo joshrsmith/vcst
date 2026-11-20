@@ -6,5 +6,6 @@ setup(name='vcst',
       author="James Price",
       author_email="jpwice100@gmail.com",
       packages=find_packages(),
-      install_requires=["vunit-hdl>=4.4.0,<4.7.0", "cocotb>=1.5.1,<2.0"]
+      python_requires=">=3.9",
+      install_requires=["vunit-hdl>=4.7.1,<6", "cocotb>=1.8,<2"]
      )
