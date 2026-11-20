@@ -60,3 +60,6 @@ jobs:
           "$HOME/venv/bin/python" tests/vhdl/cocotb_examples/run.py -p 4 --clean
           "$HOME/venv/bin/python" tests/vhdl/vunit_and_cocotb/run.py -p 4 --clean
           "$HOME/venv/bin/python" tests/vhdl/parameterize_test/run.py -p 4 --clean
+          "$HOME/venv/bin/python" tests/vhdl/test_outcomes/run.py -p 4 --clean
+          "$HOME/venv/bin/python" tests/vhdl/isolation/run.py -p 8 --clean
+          "$HOME/venv/bin/python" tests/vhdl/front_end/check.py -p 4

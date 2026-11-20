@@ -1,10 +1,11 @@
 import cocotb
+import vcst
 from vcst.utils import set_top_level
 from cocotb.triggers import RisingEdge, Timer
 from cocotb.clock import Clock
 from cocotb.result import TestSuccess, TestFailure
 
-@cocotb.test()
+@vcst.test(attributes=[".reset"])
 async def reset_test(dut):
     clock = Clock(dut.clock, 4, units="ns")
     cocotb.fork((clock.start()))

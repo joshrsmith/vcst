@@ -16,7 +16,12 @@ At the moment, the supported simulators are GHDL, NVC, Riviera-Pro and ModelSim/
 ## Supported Versions
 VCST works with cocotb 1.8 and 1.9 as well as cocotb 2.0 and later, and with VUnit 4.7.1 or later, including the upcoming VUnit 5. Any of these cocotb versions can be combined with any of these VUnit versions. The run script and the VCST interface are the same for all of them, so a project can move to cocotb 2 without changing how its tests are added and run. The cocotb test modules themselves need to be written for the cocotb version installed. NVC needs cocotb 1.9 or later. With VUnit 5, which needs Python 3.11 or later, cocotb 1.8 can be used with Python 3.11 and 3.12. Use VCST 0.0.11 or earlier with cocotb before 1.8 or VUnit before 4.7.
 
-The tests in this repository have a cocotb 1.x version (the `cocotb1` directories) and a cocotb 2.x version (the `cocotb2` directories) of each cocotb test module. The run scripts pick the one matching the installed cocotb, see `vcst.utils.compat.COCOTB2`.
+The tests in this repository have a cocotb 1.x version (the `cocotb1` directories) and a cocotb 2.x version (the `cocotb2` directories) of each cocotb test module. The run scripts pick the one matching the installed cocotb, see `vcst.utils.compat.COCOTB2`. The CI workflow runs them with every supported combination of VUnit and cocotb, on GHDL and NVC (cocotb 1.8 on GHDL only):
+
+- `tests/vhdl/cocotb_examples`, `vunit_and_cocotb` and `parameterize_test`: example test benches, including VUnit and cocotb tests of the same design.
+- `tests/vhdl/test_outcomes`: tests with known outcomes, many of them failures, such as failing assertions, exceptions, tests failing to start, timeouts, `expect_fail` and `expect_error`, and tests that have names that are suffixes of other test names, are parametrized or are generated. The run script passes only if every test is reported with its expected outcome. Also covers `pre_config` and `post_check`.
+- `tests/vhdl/isolation`: tests of two top levels in several configurations run in parallel, each checking that its simulation has the environment of its own test, and the one set by the user.
+- `tests/vhdl/front_end/check.py`: runs run scripts with different command lines, checking `from_argv` and `from_args` with and without `compile_builtins`, rejection of unknown options, attribute selection, `--list`, `--export-json`, `--elaborate` and random seeds.
 
 ## Disadvantages
 There are a few disadvantages compared to use either VUnit or Cocotb by themselves. These include:
