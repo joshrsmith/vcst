@@ -108,15 +108,15 @@ class CocoTestRun(TestRun):
             append_sim_options(config, "nvc.sim_flags", [f"--load={gpi_lib('vhpi', 'nvc')}"])
 
         if self._simulator_if.name == "modelsim":
-            append_sim_options(config, "modelsim.vsim_flags", [f"-foreign \"cocotb_init {gpi_lib('fli', 'questa')}\""])
+            append_vsim_flags(config, "modelsim", [f"-foreign \"cocotb_init {gpi_lib('fli', 'questa')}\""])
 
         if self._simulator_if.name == "rivierapro":
-            append_sim_options(config, "rivierapro.vsim_flags", ["+access", "+w", "-interceptcoutput", "-O2"])
+            append_vsim_flags(config, "rivierapro", ["+access", "+w", "-interceptcoutput", "-O2"])
 
             if self._vhdl:
-                append_sim_options(config, "rivierapro.vsim_flags", [f"-loadvhpi {gpi_lib('vhpi', 'riviera')}"])
+                append_vsim_flags(config, "rivierapro", [f"-loadvhpi {gpi_lib('vhpi', 'riviera')}"])
             else:
-                append_sim_options(config, "rivierapro.vsim_flags", [f"-pli {gpi_lib('vpi', 'riviera')}"])
+                append_vsim_flags(config, "rivierapro", [f"-pli {gpi_lib('vpi', 'riviera')}"])
 
     def run(self, output_path, read_output, *args, **kwargs):
         """
@@ -212,6 +212,15 @@ def append_sim_options(config, name, value):
     sim_flags  = config.sim_options.get(name, [])
     sim_flags  = sim_flags + value
     config.set_sim_option(name, sim_flags)
+
+def append_vsim_flags(config, simulator_name, value):
+    """
+    Appends to the vsim_flags of a vsim based simulator, and to its vsim_flags.gui if set, which VUnit uses instead of
+    vsim_flags in GUI mode.
+    """
+    append_sim_options(config, f"{simulator_name}.vsim_flags", value)
+    if f"{simulator_name}.vsim_flags.gui" in config.sim_options:
+        append_sim_options(config, f"{simulator_name}.vsim_flags.gui", value)
 
 def get_result_file_name(output_path):
     return str(Path(output_path) / "cocotb_results.xml")
