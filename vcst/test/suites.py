@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 
 from vunit.test.report import PASSED, SKIPPED, FAILED
 from vunit.ostools import write_file
+from vunit.sim_if.vsim_simulator_mixin import fix_path
 from vunit.test.suites import IndependentSimTestCase, TestRun, get_result_file_name as get_vunit_result_file_name
 
 from ..monkey_patching.environment import extra_env
@@ -113,10 +114,11 @@ class CocoTestRun(TestRun):
         if self._simulator_if.name == "rivierapro":
             append_vsim_flags(config, "rivierapro", ["+access", "+w", "-interceptcoutput", "-O2"])
 
+            # Quoted for tcl, as VUnit quotes the libraries of its pli option
             if self._vhdl:
-                append_vsim_flags(config, "rivierapro", [f"-loadvhpi {gpi_lib('vhpi', 'riviera')}"])
+                append_vsim_flags(config, "rivierapro", [f"-loadvhpi \"{fix_path(gpi_lib('vhpi', 'riviera'))}\""])
             else:
-                append_vsim_flags(config, "rivierapro", [f"-pli {gpi_lib('vpi', 'riviera')}"])
+                append_vsim_flags(config, "rivierapro", [f"-pli \"{fix_path(gpi_lib('vpi', 'riviera'))}\""])
 
     def run(self, output_path, read_output, *args, **kwargs):
         """
