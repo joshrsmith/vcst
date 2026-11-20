@@ -66,9 +66,9 @@ class CocoTestRun(TestRun):
         environ["COCOTB_RESULTS_FILE"] = get_result_file_name(output_path)
         environ["TOPLEVEL_LANG"] = "vhdl" if self._vhdl else "verilog"
 
-        if self._simulator_if.name == "ghdl":
+        if self._simulator_if.name in ("ghdl", "nvc"):
             top_level = self._top_level.lower()
-            # As done by cocotb's runner for this simulator. Ignored by cocotb 1.x.
+            # As done by cocotb's runners for these simulators. Ignored by cocotb 1.x.
             if "COCOTB_TRUST_INERTIAL_WRITES" not in os.environ:
                 environ["COCOTB_TRUST_INERTIAL_WRITES"] = "1"
         else:
@@ -87,6 +87,9 @@ class CocoTestRun(TestRun):
         """
         if self._simulator_if.name == "ghdl":
             append_sim_options(config, "ghdl.sim_flags", [f"--vpi={gpi_lib('vpi', 'ghdl')}"])
+
+        if self._simulator_if.name == "nvc":
+            append_sim_options(config, "nvc.sim_flags", [f"--load={gpi_lib('vhpi', 'nvc')}"])
 
         if self._simulator_if.name == "modelsim":
             append_sim_options(config, "modelsim.vsim_flags", [f"-foreign \"cocotb_init {gpi_lib('fli', 'questa')}\""])

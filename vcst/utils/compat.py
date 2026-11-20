@@ -11,6 +11,8 @@ import cocotb
 COCOTB_VERSION = tuple(int(part) for part in re.findall(r"\d+", cocotb.__version__)[:2])
 #: True when the cocotb installed is 2.0 or later
 COCOTB2 = COCOTB_VERSION >= (2, 0)
+#: True when the cocotb installed supports NVC, which cocotb 1.9 added
+COCOTB_SUPPORTS_NVC = COCOTB_VERSION >= (1, 9)
 
 if COCOTB2:
     import cocotb.triggers  # cocotb 2.0 fails to import cocotb.regression first because of a circular import

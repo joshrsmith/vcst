@@ -1,9 +1,11 @@
 import inspect
 from typing import Optional
 
+import cocotb
 from vunit import VUnit
 
 from .library import VCSTLibrary
+from ..utils.compat import COCOTB_SUPPORTS_NVC
 from ..utils.mod_utils import import_mod
 
 # VUnit 4.x adds the VHDL builtins unless compile_builtins=False, VUnit 5 only when asked to
@@ -117,6 +119,10 @@ class VCST(VUnit):
 
         if top_level_type not in ("entity", "module"):
             raise RuntimeError(f"Invalid top level type {top_level_type} in cocotb module {cocotb_module} specified. Please specify either entity or module.")
+
+        simulator_class = self._simulator_class
+        if simulator_class is not None and simulator_class.name == "nvc" and not COCOTB_SUPPORTS_NVC:
+            raise RuntimeError(f"NVC needs cocotb 1.9 or later, cocotb {cocotb.__version__} is installed")
 
         library = self.library(top_level_library)
         top_level_design_unit = None
