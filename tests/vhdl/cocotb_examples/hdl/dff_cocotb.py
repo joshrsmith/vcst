@@ -27,15 +27,8 @@
 import random
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge
-from cocotb.binary import BinaryValue
-
 from cocotb.regression import TestFactory
-from cocotb_bus.monitors import Monitor
-from cocotb_bus.drivers import BitDriver
-from cocotb_bus.scoreboard import Scoreboard
-
-
+from cocotb.triggers import RisingEdge
 
 from vcst.utils import set_top_level
 
@@ -48,102 +41,89 @@ from vcst.utils import set_top_level
 #    |______|
 
 
-class BitMonitor(Monitor):
-    """Observe a single-bit input or output of the DUT."""
+class BitMonitor:
+    """Observe a single-bit input or output of the DUT at each rising clock edge."""
 
-    def __init__(self, name, signal, clk, callback=None, event=None):
-        self.name = name
+    def __init__(self, signal, clk, callback):
         self.signal = signal
         self.clk = clk
-        Monitor.__init__(self, callback, event)
+        self.callback = callback
+        self._task = cocotb.start_soon(self._monitor())
 
-    async def _monitor_recv(self):
+    async def _monitor(self):
         clkedge = RisingEdge(self.clk)
 
         while True:
             # Capture signal at rising edge of clock
             await clkedge
-            vec = self.signal.value
-            self._recv(vec)
+            self.callback(int(self.signal.value))
+
+    def stop(self):
+        self._task.kill()
 
 
-def input_gen():
-    """Generator for input data applied by BitDriver.
-
-    Continually yield a tuple with the number of cycles to be on
-    followed by the number of cycles to be off.
-    """
+async def drive_bits(signal, clk):
+    """Drive random data, holding each value for a random number of cycles."""
+    clkedge = RisingEdge(clk)
     while True:
-        yield random.randint(1, 5), random.randint(1, 5)
+        signal.value = random.randint(0, 1)
+        for _ in range(random.randint(1, 5)):
+            await clkedge
 
 
-class DFF_TB(object):
+class DFF_TB:
     def __init__(self, dut, init_val):
         """
         Setup the testbench.
 
-        *init_val* signifies the ``BinaryValue`` which must be captured by the
+        *init_val* signifies the value which must be captured by the
         output monitor with the first rising clock edge.
         This must match the initial state of the D flip-flop in RTL.
         """
-        # Some internal state
         self.dut = dut
         self.stopped = False
 
-        # Create input driver and output monitor
-        self.input_drv = BitDriver(signal=dut.d, clk=dut.c, generator=input_gen())
-        self.output_mon = BitMonitor(name="output", signal=dut.q, clk=dut.c)
+        # What goes in at d comes out on q one clock cycle later, starting with init_val
+        self.expected_output = [init_val]
+        self.received_output = []
 
-        # Create a scoreboard on the outputs
-        self.expected_output = [init_val]  # a list with init_val as the first element
-        self.scoreboard = Scoreboard(dut)
-        self.scoreboard.add_interface(self.output_mon, self.expected_output)
-
-        # Use the input monitor to reconstruct the transactions from the pins
-        # and send them to our 'model' of the design.
-        self.input_mon = BitMonitor(name="input", signal=dut.d, clk=dut.c,
-                                    callback=self.model)
+        self.input_mon = BitMonitor(signal=dut.d, clk=dut.c, callback=self.model)
+        self.output_mon = BitMonitor(signal=dut.q, clk=dut.c, callback=self.received_output.append)
+        self.input_drv = None
 
     def model(self, transaction):
-        """Model the DUT based on the input *transaction*.
-
-        For a D flip-flop, what goes in at ``d`` comes out on ``q``,
-        so the value on ``d`` (put into *transaction* by our ``input_mon``)
-        can be used as expected output without change.
-        Thus we can directly append *transaction* to the ``expected_output`` list,
-        except for the very last clock cycle of the simulation
-        (that is, after ``stop()`` has been called).
-        """
+        """Model the DUT based on the input *transaction*, except for the last clock cycle."""
         if not self.stopped:
             self.expected_output.append(transaction)
 
     def start(self):
         """Start generating input data."""
-        self.input_drv.start()
+        self.input_drv = cocotb.start_soon(drive_bits(self.dut.d, self.dut.c))
 
     def stop(self):
-        """Stop generating input data.
-
-        Also stop generation of expected output transactions.
-        One more clock cycle must be executed afterwards so that the output of
-        the D flip-flop can be checked.
-        """
-        self.input_drv.stop()
+        """Stop generating input data, and expected output, after the current clock cycle."""
+        self.input_drv.kill()
         self.stopped = True
 
+    def check(self):
+        self.input_mon.stop()
+        self.output_mon.stop()
+        assert self.received_output == self.expected_output[:len(self.received_output)]
+        assert len(self.received_output) == len(self.expected_output)
 
-async def run_test(dut):
+
+async def run_test(dut, cycles):
     """Setup testbench and run a test."""
 
-    cocotb.fork(Clock(dut.c, 10, 'us').start(start_high=False))
+    cocotb.start_soon(Clock(dut.c, 10, units="us").start(start_high=False))
 
-    tb = DFF_TB(dut, init_val=BinaryValue(0))
+    tb = DFF_TB(dut, init_val=0)
 
     clkedge = RisingEdge(dut.c)
 
-    # Apply random input data by input_gen via BitDriver for 100 clock cycles.
+    # Apply random input data for the given number of clock cycles.
     tb.start()
-    for _ in range(100):
+    for _ in range(cycles):
         await clkedge
 
     # Stop generation of input data. One more clock cycle is needed to capture
@@ -151,11 +131,12 @@ async def run_test(dut):
     tb.stop()
     await clkedge
 
-    # Print result of scoreboard.
-    raise tb.scoreboard.result
+    tb.check()
 
 
-# Register the test.
+# Register the tests: run_test_001 and run_test_002
 factory = TestFactory(run_test)
+factory.add_option("cycles", [10, 100])
 factory.generate_tests()
+
 set_top_level("dff", "entity", "lib")

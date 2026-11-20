@@ -26,7 +26,7 @@ async def adder_basic_test(dut):
 @cocotb.test()
 async def adder_randomised_test(dut):
     """Test for adding 2 random numbers multiple times"""
-    width = dut.DATA_WIDTH.value
+    width = int(dut.DATA_WIDTH.value)
     max_val = 2**width-1
     for i in range(10):
         A = random.randint(0, max_val)
