@@ -8,19 +8,25 @@ permissions:
   contents: read
 
 jobs:
+  # The combinations of VUnit and cocotb versions to test come from tests/run_matrix.py, which every test job runs
+  matrix:
+    name: Combinations
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - id: matrix
+        run: echo "matrix=$(python3 tests/run_matrix.py --github-matrix ghdl nvc)" >> "$GITHUB_OUTPUT"
+
   test:
     name: VUnit ${{ matrix.vunit }}, cocotb ${{ matrix.cocotb }}, ${{ matrix.simulator }}
+    needs: matrix
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
-      matrix:
-        vunit: ["4.7.1", "5.0.0.dev16"]
-        cocotb: ["1.8.1", "1.9.2", "2.0.1", "2.1.0"]
-        simulator: [ghdl, nvc]
-        exclude:
-          # NVC needs cocotb 1.9 or later
-          - cocotb: "1.8.1"
-            simulator: nvc
+      matrix: ${{ fromJSON(needs.matrix.outputs.matrix) }}
     env:
       GHDL_VERSION: "6.0.0"
       NVC_VERSION: "1.23.1"
@@ -48,18 +54,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ./nvc.deb
 
-      # The virtual environment is used without activating it, which VCST supports
-      - name: Install VCST
-        run: |
-          python -m venv "$HOME/venv"
-          "$HOME/venv/bin/python" -m pip install --upgrade pip
-          "$HOME/venv/bin/python" -m pip install "vunit-hdl==${{ matrix.vunit }}" "cocotb==${{ matrix.cocotb }}" .
-
+      # Installs the versions in a virtual environment, whose Python is run without activating it, which VCST supports
       - name: Run tests
-        run: |
-          "$HOME/venv/bin/python" tests/vhdl/cocotb_examples/run.py -p 4 --clean
-          "$HOME/venv/bin/python" tests/vhdl/vunit_and_cocotb/run.py -p 4 --clean
-          "$HOME/venv/bin/python" tests/vhdl/parameterize_test/run.py -p 4 --clean
-          "$HOME/venv/bin/python" tests/vhdl/test_outcomes/run.py -p 4 --clean
-          "$HOME/venv/bin/python" tests/vhdl/isolation/run.py -p 8 --clean
-          "$HOME/venv/bin/python" tests/vhdl/front_end/check.py -p 4
+        env:
+          VUNIT_VERSION: ${{ matrix.vunit }}
+          COCOTB_VERSION: ${{ matrix.cocotb }}
+        run: python tests/run_matrix.py --vunit "$VUNIT_VERSION" --cocotb "$COCOTB_VERSION" --output "$HOME/matrix" --show-logs

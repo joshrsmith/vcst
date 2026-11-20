@@ -23,7 +23,7 @@ VCST supports VUnit 4.7.1 and VUnit 5 (pre-release, tested with 5.0.0.dev16), an
 I invite anyone who wants to help me broaden simulator support to contribute. I also intend to add support for Icarus as well. This is bigger effort as VUnit does not support Icarus (as it does not support enough of System Verilog). VUnit's SystemVerilog testbenches would not work, but cocotb testbenches could work.
 
 ## Tests
-The tests in this repository have a cocotb 1.x version (the `cocotb1` directories) and a cocotb 2.x version (the `cocotb2` directories) of each cocotb test module. The run scripts pick the one matching the installed cocotb, see `vcst.utils.compat.COCOTB2`. The CI workflow runs them with every combination of VUnit and cocotb, on GHDL and NVC (cocotb 1.8 on GHDL only):
+The tests in this repository have a cocotb 1.x version (the `cocotb1` directories) and a cocotb 2.x version (the `cocotb2` directories) of each cocotb test module. The run scripts pick the one matching the installed cocotb, see `vcst.utils.compat.COCOTB2`. Each script passes only if all of its tests have their expected outcomes:
 
 - `tests/vhdl/cocotb_examples`, `vunit_and_cocotb` and `parameterize_test`: example test benches, including VUnit and cocotb tests of the same design.
 - `tests/vhdl/test_outcomes`: tests with known outcomes, many of them failures, such as failing assertions, exceptions, tests failing to start, timeouts, `expect_fail` and `expect_error`, and tests that have names that are suffixes of other test names, are parametrized, are generated, are imported from another module or skip themselves while they run. The run script passes only if every test is reported with its expected outcome. Also covers `pre_config` and `post_check`.
@@ -31,6 +31,17 @@ The tests in this repository have a cocotb 1.x version (the `cocotb1` directorie
 - `tests/vhdl/front_end/check.py`: runs run scripts with different command lines, checking `from_argv` and `from_args` with and without `compile_builtins`, rejection of unknown options, attribute selection, `--list`, `--export-json`, `--elaborate`, random seeds (`--seed`, `--seed repeat` and the `seed` simulation option), a `COCOTB_TESTCASE` set by the user and tests with the same name.
 
 `tests/verilog` has cocotb tests of a Verilog top level with an integer and a string parameter, checking that the parameters of each configuration reach the simulation. It needs Riviera-PRO, so CI doesn't run it.
+
+### Running all tests
+`tests/run_matrix.py` runs every suite with every supported combination of VUnit and cocotb, on the simulator selected by `VUNIT_SIMULATOR`, and reports which runs passed. It installs each combination in a virtual environment of its own, together with the VCST of the checkout, so all it needs is Python 3.9 or later and access to PyPI, or the package index pip is configured with. Nothing is installed in the environment it is run with. For example, with Riviera-PRO:
+
+```bash
+export VUNIT_SIMULATOR=rivierapro
+export VUNIT_RIVIERAPRO_PATH=/path/to/riviera-pro/bin
+python3 tests/run_matrix.py --output /path/to/results -p 4
+```
+
+Everything it creates is in the output directory (`matrix_out` by default): the virtual environments, which later runs with the same output directory reuse, the output and console log of each run, and `report.md`, a summary of the results with the simulator, OS and Python versions. The suites are run with one thread and with `-p` threads, so with a simulator licensed per process, `-p` shouldn't exceed the licenses available. `--quick` runs 4 combinations still covering each version, `--vunit` and `--cocotb` select other versions, also ones not supported yet, and `--suite` selects suites, see `--help`. Every combination is installed with the Python running the script, CI uses Python 3.12. CI runs the same script, one combination per job, with GHDL and NVC.
 
 ## Disadvantages
 There are a few disadvantages compared to use either VUnit or Cocotb by themselves. These include:
