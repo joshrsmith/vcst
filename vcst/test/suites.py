@@ -10,17 +10,7 @@ from ..utils.compat import gpi_environ, gpi_lib, seed_variable, test_selection_e
 
 class IndependentCocoSimTestCase(IndependentSimTestCase):
     def __init__(self, test, config, simulator_if, elaborate_only=False, seed=None):
-        self._name = "%s.%s" % (config.library_name, config.design_unit_name)
-
-        if not config.is_default:
-            self._name += "." + config.name
-
-        if test.is_explicit:
-            self._name += "." + test.name
-        elif config.is_default:
-            # JUnit XML test reports wants three dotted name hierarchies
-            self._name += ".all"
-
+        self._name = self.get_name(test, config)
         self._configuration = config
         self._test = test
 
@@ -38,6 +28,22 @@ class IndependentCocoSimTestCase(IndependentSimTestCase):
             test_modules={test.name: test.defining_module},
             seed=seed,
         )
+
+    @staticmethod
+    def get_name(test, config):
+        """Returns the full name of the test run with the configuration"""
+        name = "%s.%s" % (config.library_name, config.design_unit_name)
+
+        if not config.is_default:
+            name += "." + config.name
+
+        if test.is_explicit:
+            name += "." + test.name
+        elif config.is_default:
+            # JUnit XML test reports wants three dotted name hierarchies
+            name += ".all"
+
+        return name
 
 class CocoTestRun(TestRun):
     def __init__(self, vhdl, top_level, simulator_if, config, elaborate_only, cocotb_module, cocotb_module_location, test_suite_name, test_cases, result_names=None, test_modules=None, seed=None):

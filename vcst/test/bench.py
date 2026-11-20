@@ -12,13 +12,20 @@ from ..utils.compat import find_cocotb_tests
 # VUnit 5 gives each test a seed and passes it to create_tests before elaborate_only
 _VUNIT_HAS_SEEDS = "seed" in inspect.signature(TestBench.create_tests).parameters
 
+try:
+    # Looks up the seed of a test in the test history, which VUnit keeps since 5.0.0.dev8
+    from vunit.test.bench import _get_historic_seed
+except ImportError:
+    def _get_historic_seed(test_history, test_suite_name, test_name=None):
+        return None
+
 def _split_create_tests_args(args):
-    """Returns (seed, elaborate_only, test_list) from the arguments VUnit gives create_tests after simulator_if."""
+    """
+    Returns (seed, elaborate_only, test_list) from the arguments VUnit gives create_tests after simulator_if. seed is
+    "repeat" to repeat the seeds of the previous run (--seed repeat).
+    """
     if _VUNIT_HAS_SEEDS:
         seed, elaborate_only, test_list = (list(args) + [None] * 3)[:3]
-        if seed == "repeat":
-            # VCST keeps no test history to repeat seeds from, so a new seed is generated
-            seed = None
     else:
         seed = None
         elaborate_only, test_list = (list(args) + [None] * 2)[:2]
@@ -84,8 +91,13 @@ class CocoTestBench(TestBench):
         if test_list is None:
             test_list = TestList()
 
+        # The seeds of previous runs, kept by VUnit 5
+        test_history = {}
+        if seed == "repeat" and self._database is not None and b"test_history" in self._database:
+            test_history = self._database[b"test_history"]
+
         for test_case in self._test_cases:
-            test_case.create_coco_tests(simulator_if, seed, elaborate_only, test_list)
+            test_case.create_coco_tests(simulator_if, seed, elaborate_only, test_list, test_history)
 
         return test_list
 
@@ -161,15 +173,21 @@ class CocoTestConfigurationVisitor(TestConfigurationVisitor):
         seed, elaborate_only, test_list = _split_create_tests_args(args)
         self.create_coco_tests(simulator_if, seed, elaborate_only, test_list)
 
-    def create_coco_tests(self, simulator_if, seed, elaborate_only, test_list):
+    def create_coco_tests(self, simulator_if, seed, elaborate_only, test_list, test_history=None):
         for config in self._get_configurations_to_run():
+            test_seed = seed
+            if seed == "repeat":
+                # The seed of the previous run of the test, None (a new seed) if there is none
+                name = IndependentCocoSimTestCase.get_name(self._test, config)
+                test_seed = _get_historic_seed(test_history or {}, name, name)
+
             test_list.add_test(
                 IndependentCocoSimTestCase(
                     test=self._test,
                     config=config,
                     simulator_if=simulator_if,
                     elaborate_only=elaborate_only,
-                    seed=seed,
+                    seed=test_seed,
                 )
             )
 

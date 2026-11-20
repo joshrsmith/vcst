@@ -11,7 +11,9 @@ class VCSTLibrary(Library):
         """
         Adds a test bench running the tests of cocotb_module with design_unit as top level.
         """
-        test_bench = CocoTestBench(design_unit, cocotb_module, cocotb_module_location, database=None)
+        # The database holds the test history, from which --seed repeat takes the seeds of the previous run
+        test_bench = CocoTestBench(design_unit, cocotb_module, cocotb_module_location,
+                                   database=self._test_bench_list._database)
         self._test_bench_list._add_test_bench(test_bench)
         return self.test_bench(design_unit.name)
 

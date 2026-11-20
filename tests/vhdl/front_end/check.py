@@ -151,6 +151,13 @@ if VUNIT_HAS_SEEDS:
           results[0] is not None and results[0] == results[1], str(results))
     check("a different VUnit --seed gives different cocotb random values",
           results[0] is not None and results[2] is not None and results[0][1] != results[2][1], str(results))
+
+    #--seed repeat repeats the seeds of the previous run, kept by VUnit in the output path
+    _, output, tests = run("seed_repeat", "run_from_argv.py", "lib.front_end_dut.random_values")
+    first = random_values(tests)
+    _, output, tests = run("seed_repeat", "run_from_argv.py", "--seed", "repeat", "lib.front_end_dut.random_values")
+    check("--seed repeat gives the cocotb random values of the previous run",
+          first is not None and random_values(tests) == first, f"{first} {random_values(tests)}\n{output}")
 else:
     print("skip --seed checks: VUnit before 5 has no --seed")
 
