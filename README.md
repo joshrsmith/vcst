@@ -30,6 +30,8 @@ The tests in this repository have a cocotb 1.x version (the `cocotb1` directorie
 - `tests/vhdl/isolation`: tests of two top levels in several configurations run in parallel, each checking that its simulation has the environment of its own test, and the one set by the user.
 - `tests/vhdl/front_end/check.py`: runs run scripts with different command lines, checking `from_argv` and `from_args` with and without `compile_builtins`, rejection of unknown options, attribute selection, `--list`, `--export-json`, `--elaborate` and random seeds.
 
+`tests/verilog` has cocotb tests of a Verilog top level with an integer and a string parameter, checking that the parameters of each configuration reach the simulation. It needs Riviera-PRO, so CI doesn't run it.
+
 ## Disadvantages
 There are a few disadvantages compared to use either VUnit or Cocotb by themselves. These include:
 1. Simulator Support - VUnit supports fewer simulators than cocotb. In addition I do not have access to most simulators and thus cannot ensure that other simulators work.
