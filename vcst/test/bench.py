@@ -66,6 +66,10 @@ class CocoTestBench(TestBench):
         #Iterate every value in the module looking for cocotb tests
         for obj, test_names in find_cocotb_tests(cocotb_module):
             for test_name in test_names:
+                # VUnit identifies a test by its name, e.g. in the report and the name of its output directory
+                if any(test.name == test_name.name for test in tests):
+                    raise RuntimeError(f"There are several cocotb tests named {test_name.name!r} in "
+                                       f"{cocotb_module_location}, VCST needs unique names")
                 coco_test = CocoTest(test_name.name, self.design_unit, cocotb_module, cocotb_module_location,
                                      result_name=test_name.result_name, defining_module=test_name.module)
                 for attr in getattr(obj, "vcst_attributes", []):

@@ -133,6 +133,12 @@ if COCOTB2:
     check("a COCOTB_TESTCASE set by the user doesn't change which test runs",
           rc == 0 and tests.get("lib.front_end_dut.untagged", ("",))[0] == "passed", output)
 
+#Tests with the same name, which cocotb 2.x allows
+if COCOTB2:
+    rc, output, tests = run("duplicate_names", "run_duplicate_names.py")
+    check("cocotb tests with the same name are refused with a clear error",
+          rc != 0 and "tests named 'duplicate'" in output and not tests, output)
+
 #Random seeds
 seed_variable = "COCOTB_RANDOM_SEED" if COCOTB2 else "RANDOM_SEED"
 _, output, tests = run("user_seed", "run_from_argv.py", "lib.front_end_dut.random_values", env={seed_variable: "12345"})
