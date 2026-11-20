@@ -93,4 +93,10 @@ expect("passed", "passing", "ing", "expect_fail_failing", "expect_error_raised",
 expect("failed", "failing_assert", "erroring", "fails_to_start", "expect_fail_passing", "expect_error_not_raised",
        "timing_out", "alias_of_failing", "factory_test_002")
 
+#Tests defined in another module, which cocotb names after that module
+from outcomes_imported import imported_passing, imported_failing
+
+expect("passed", "imported_passing")
+expect("failed", "imported_failing")
+
 set_top_level("outcomes_dut", "entity", "lib")

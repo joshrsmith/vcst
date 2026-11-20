@@ -100,4 +100,10 @@ if hasattr(cocotb, "xfail"):
     expect("passed", "xfail_raised")
     expect("failed", "xfail_not_raised")
 
+#Tests defined in another module, which cocotb names after that module
+from outcomes_imported import imported_passing, imported_failing
+
+expect("passed", "imported_passing")
+expect("failed", "imported_failing")
+
 set_top_level("outcomes_dut", "entity", "lib")

@@ -60,7 +60,7 @@ class CocoTestBench(TestBench):
         for obj, test_names in find_cocotb_tests(cocotb_module):
             for test_name in test_names:
                 coco_test = CocoTest(test_name.name, self.design_unit, cocotb_module, cocotb_module_location,
-                                     result_name=test_name.result_name)
+                                     result_name=test_name.result_name, defining_module=test_name.module)
                 for attr in getattr(obj, "vcst_attributes", []):
                     coco_test.add_attribute(CocoTestAttribute(attr, None))
                 tests.append(coco_test)
@@ -95,9 +95,11 @@ class CocoTest(object):
     TODO: Describe
     """
 
-    def __init__(self, name, design_unit, cocotb_module, cocotb_module_location, result_name=None):
+    def __init__(self, name, design_unit, cocotb_module, cocotb_module_location, result_name=None,
+                 defining_module=None):
         self._name = name
         self._result_name = name if result_name is None else result_name
+        self._defining_module = defining_module
         self._top_level = cocotb_module.top_level
         self._vhdl = design_unit.is_entity
         self._location = FileLocation(design_unit.file_name, None, None, None) #offset, length, lineno set to None
@@ -113,6 +115,11 @@ class CocoTest(object):
     def result_name(self):
         """The name of the test in the cocotb results file"""
         return self._result_name
+
+    @property
+    def defining_module(self):
+        """The name of the module defining the test if it was imported from another module, else None"""
+        return self._defining_module
 
     @property
     def location(self):

@@ -31,39 +31,48 @@ else:
 class CocotbTestName:
     """
     The names of a cocotb test. name is the name used to select the test, which is also the name of the VUnit test,
-    and result_name the name of the test in the cocotb results file.
+    and result_name the name of the test in the cocotb results file. module is the name of the module defining the
+    test, which cocotb 2.x selects the test by, if it is another module than the one whose tests are run, else None.
     """
-    def __init__(self, name, result_name=None):
+    def __init__(self, name, result_name=None, module=None):
         self.name = name
         self.result_name = name if result_name is None else result_name
+        self.module = module
 
 def find_cocotb_tests(module):
     """
     Returns (test_object, test_names) for every module level object which cocotb would run as test(s), in definition
     order. test_object is the object found in the module, test_names the CocotbTestNames of the tests it expands to.
     """
+    def cocotb2_test_name(test):
+        # cocotb 2.x names a test after the module defining it, which differs for a test imported from another module
+        defined_in = getattr(test, "module", module.__name__)
+        return CocotbTestName(test.name, module=None if defined_in == module.__name__ else defined_in)
+
     found = []
     for attr_name, obj in vars(module).items():
         if COCOTB2:
             if isinstance(obj, cocotb.regression.Test):
-                found.append((obj, [CocotbTestName(obj.name)]))
+                found.append((obj, [cocotb2_test_name(obj)]))
             elif isinstance(obj, _TEST_GENERATOR_TYPES):
-                found.append((obj, [CocotbTestName(test.name) for test in obj.generate_tests()]))
+                found.append((obj, [cocotb2_test_name(test) for test in obj.generate_tests()]))
         elif isinstance(obj, _Cocotb1Test):
             # cocotb 1.x selects tests by their name in the module, but reports them by their __qualname__
             found.append((obj, [CocotbTestName(attr_name, obj.__qualname__)]))
     return found
 
-def test_selection_environ(module_name, test_names, top_level, seed):
+def test_selection_environ(module_name, test_names, top_level, seed, test_modules=None):
     """
     Returns the environment variables selecting the module, tests (names used to select tests), top level and
-    random seed (None to let cocotb choose) of a cocotb run.
+    random seed (None to let cocotb choose) of a cocotb run. test_modules maps the names of tests defined in other
+    modules to the names of these modules.
     """
+    test_modules = test_modules or {}
     if COCOTB2:
         environ = {
             "COCOTB_TEST_MODULES": module_name,
             "COCOTB_TEST_FILTER": "|".join(
-                f"^{re.escape(module_name)}\\.{re.escape(name)}$" for name in test_names
+                f"^{re.escape(test_modules.get(name) or module_name)}\\.{re.escape(name)}$" for name in test_names
             ),
             "COCOTB_TOPLEVEL": top_level,
         }

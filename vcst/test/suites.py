@@ -35,11 +35,12 @@ class IndependentCocoSimTestCase(IndependentSimTestCase):
             test_suite_name=self._name,
             test_cases=[test.name],
             result_names={test.result_name: test.name},
+            test_modules={test.name: test.defining_module},
             seed=seed,
         )
 
 class CocoTestRun(TestRun):
-    def __init__(self, vhdl, top_level, simulator_if, config, elaborate_only, cocotb_module, cocotb_module_location, test_suite_name, test_cases, result_names=None, seed=None):
+    def __init__(self, vhdl, top_level, simulator_if, config, elaborate_only, cocotb_module, cocotb_module_location, test_suite_name, test_cases, result_names=None, test_modules=None, seed=None):
         # TestRun.__init__ differs between VUnit versions, so set its attributes directly
         self._simulator_if = simulator_if
         self._config = config
@@ -49,6 +50,8 @@ class CocoTestRun(TestRun):
         self._seed = seed
         # Maps the names of the tests in the cocotb results file to their names in test_cases
         self._result_names = result_names if result_names is not None else {}
+        # Maps the names of tests defined in other modules than the cocotb module to the names of these modules
+        self._test_modules = test_modules if test_modules is not None else {}
         self._cocotb_module_location = cocotb_module_location
         self._top_level = top_level
         self._vhdl = vhdl
@@ -75,7 +78,8 @@ class CocoTestRun(TestRun):
             top_level = self._top_level
 
         cocotb_seed = None if seed_variable() in os.environ else _get_cocotb_seed(seed)
-        environ.update(test_selection_environ(mod_name, self._test_cases, top_level, cocotb_seed))
+        environ.update(test_selection_environ(mod_name, self._test_cases, top_level, cocotb_seed,
+                                              self._test_modules))
 
         return environ
 
