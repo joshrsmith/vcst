@@ -10,8 +10,27 @@ VCST seeks to combine the best of both worlds. This includes inheriting VUnit's 
 ## Goals
 The goal of VCST is to provide a proof of example concept of VUnit and Cocotb working together without a single source change to other project. This will provide a couple of benefits. First, it is an interim solutions for VUnit and Cocotb users. Second, it will shed some light on what works could be done to make cooctb and vunit even more modular. Third, it has given me an opportunity to dig more into how these tools work so I can contribute more to these amazing tools.
 
-## Simulator Support
-At the moment, the only simulators supported are GHDL and Riviera-Pro. GHDL has very limited support for VPI and therefore Cocotb can't fully utilize it. I will make attempts for supporting ModelSim/Questa as well. I invite anyone who wants to help me broaden simulator support to contribute. I also intend to add support for Icarus as well. This is bigger effort as VUnit does not support Icarus (as it does not support enough of System Verilog). VUnit's SystemVerilog testbenches would not work, but cocotb testbenches could work. 
+## Compatibility
+VCST supports VUnit 4.7.1 and VUnit 5 (pre-release, tested with 5.0.0.dev16), and cocotb 1.8, 1.9, 2.0 and 2.1. Any of these VUnit versions can be combined with any of these cocotb versions, and CI tests every combination. The run script and the VCST interface are the same for all of them, but the cocotb test modules must be written for the installed cocotb version. For cocotb before 1.8 or VUnit before 4.7, use VCST 0.0.11 or earlier.
+
+| Simulator       | Status                | Notes                                                                  |
+|-----------------|-----------------------|------------------------------------------------------------------------|
+| GHDL            | Tested in CI          | GHDL's VPI support is limited, so cocotb can't use everything with it  |
+| NVC             | Tested in CI          | Needs cocotb 1.9 or later                                              |
+| Riviera-PRO     | Supported, not tested | Not run with the current versions of VUnit and cocotb; reports welcome |
+| ModelSim/Questa | Supported, not tested | Same as Riviera-PRO                                                    |
+
+I invite anyone who wants to help me broaden simulator support to contribute. I also intend to add support for Icarus as well. This is bigger effort as VUnit does not support Icarus (as it does not support enough of System Verilog). VUnit's SystemVerilog testbenches would not work, but cocotb testbenches could work.
+
+## Tests
+The tests in this repository have a cocotb 1.x version (the `cocotb1` directories) and a cocotb 2.x version (the `cocotb2` directories) of each cocotb test module. The run scripts pick the one matching the installed cocotb, see `vcst.utils.compat.COCOTB2`. The CI workflow runs them with every combination of VUnit and cocotb, on GHDL and NVC (cocotb 1.8 on GHDL only):
+
+- `tests/vhdl/cocotb_examples`, `vunit_and_cocotb` and `parameterize_test`: example test benches, including VUnit and cocotb tests of the same design.
+- `tests/vhdl/test_outcomes`: tests with known outcomes, many of them failures, such as failing assertions, exceptions, tests failing to start, timeouts, `expect_fail` and `expect_error`, and tests that have names that are suffixes of other test names, are parametrized, are generated, are imported from another module or skip themselves while they run. The run script passes only if every test is reported with its expected outcome. Also covers `pre_config` and `post_check`.
+- `tests/vhdl/isolation`: tests of two top levels in several configurations run in parallel, each checking that its simulation has the environment of its own test, and the one set by the user.
+- `tests/vhdl/front_end/check.py`: runs run scripts with different command lines, checking `from_argv` and `from_args` with and without `compile_builtins`, rejection of unknown options, attribute selection, `--list`, `--export-json`, `--elaborate`, random seeds (`--seed`, `--seed repeat` and the `seed` simulation option), a `COCOTB_TESTCASE` set by the user and tests with the same name.
+
+`tests/verilog` has cocotb tests of a Verilog top level with an integer and a string parameter, checking that the parameters of each configuration reach the simulation. It needs Riviera-PRO, so CI doesn't run it.
 
 ## Disadvantages
 There are a few disadvantages compared to use either VUnit or Cocotb by themselves. These include:
@@ -45,6 +64,8 @@ from vcst import VCST
 ui = VCST.from_argv()
 ```
 
+Like VUnit before version 5, VCST adds VUnit's VHDL builtins by default. Pass `compile_builtins=False` to `from_argv` or `from_args` to leave them out, for example in order to call `ui.add_vhdl_builtins()` with arguments of your own.
+
 Now to import a cocotb test module there are two steps. The cocotb module itself must call the set_top_level function defined in VCST. The set_top_level function takes in three arguments:
 1. top_level_name - Top level entity or module that this cocotb tests.
 2. top_level_type - "entity" if VHDL, "module" if verilog.
@@ -53,30 +74,29 @@ Now to import a cocotb test module there are two steps. The cocotb module itself
 ```python
 import cocotb
 from vcst.utils import set_top_level
-from cocotb.triggers import RisingEdge, Timer
+from cocotb.triggers import RisingEdge
 from cocotb.clock import Clock
-from cocotb.result import TestSuccess, TestFailure
 
 @cocotb.test()
 async def reset_test(dut):
-    clock = Clock(dut.clock, 4, units="ns")
-    cocotb.fork((clock.start()))
+    Clock(dut.clock, 4, unit="ns").start()
 
     await RisingEdge(dut.clock)
-    dut.reset <= 1
-    dut.enable <= 0
+    dut.reset.value = 1
+    dut.enable.value = 0
     await RisingEdge(dut.clock)
-    dut.reset <= 0
+    dut.reset.value = 0
     await RisingEdge(dut.clock)
 
-    if dut.counter_value.value != 0:
-       raise TestFailure(f"Counter value did not reset to 0.")
-
-    raise TestSuccess("Test passed.")
+    assert dut.counter_value.value == 0, "Counter value did not reset to 0."
 
 set_top_level("counter", "entity", "lib") #This is different than a normal cocotb testbench
 
 ```
+
+Every test cocotb would run from the module becomes a VUnit test, including those generated by `@cocotb.parametrize` and those imported from other modules. VUnit needs every test of a module to have a name of its own, so VCST refuses tests with the same name, which cocotb 2.x allows. A test skipped while it runs (`pytest.skip()` with cocotb 2.1) passes, as a VUnit test that runs either passes or fails. Tests decorated with `@vcst.test(attributes=[".my_attribute"])` instead of `@cocotb.test()` get VUnit attributes, which can be used to select tests with the `--with-attributes` and `--without-attributes` options.
+
+With VUnit 5, the seed VUnit gives a test is also used as the cocotb random seed, so `--seed` and `--seed repeat` work for cocotb tests as for VUnit tests. The `seed` simulation option can be any string: a decimal number, such as a seed reported by cocotb, becomes the cocotb seed as it is. A seed set with `COCOTB_RANDOM_SEED` (`RANDOM_SEED` with cocotb 1.x) takes precedence.
 
 Once that is defined, the cocotb module can be added via the ui object.
 ```python
@@ -85,6 +105,8 @@ adder_tb.add_config(name="data_width_8", generics={"DATA_WIDTH": 8})
 adder_tb.add_config(name="data_width_16", generics={"DATA_WIDTH": 16})
 ```
 Notice how the adder_tb can have configurations with different generics added to it, much like a normal testbench.
+
+With Riviera-PRO, a list or tuple given as the value of a generic becomes an aggregate, e.g. `["FOO", "BAR"]` becomes `(FOO,BAR)`. Generics of a VHDL top level are otherwise passed to the simulator as written, as with VUnit, so they are written as VHDL: `"FOO"` for an enumeration literal, `'x"00FF"'`, `"(FOO,BAR)"`, and quotes are only added to values containing spaces. Strings given to a Verilog top level are quoted, as Riviera-PRO needs for string parameters.
 
 Now you're all set. Run your run.py script like you would any vuint run script.
 

@@ -1,0 +1,65 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: VUnit ${{ matrix.vunit }}, cocotb ${{ matrix.cocotb }}, ${{ matrix.simulator }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        vunit: ["4.7.1", "5.0.0.dev16"]
+        cocotb: ["1.8.1", "1.9.2", "2.0.1", "2.1.0"]
+        simulator: [ghdl, nvc]
+        exclude:
+          # NVC needs cocotb 1.9 or later
+          - cocotb: "1.8.1"
+            simulator: nvc
+    env:
+      GHDL_VERSION: "6.0.0"
+      NVC_VERSION: "1.23.1"
+      VUNIT_SIMULATOR: ${{ matrix.simulator }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install GHDL
+        if: matrix.simulator == 'ghdl'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgnat-13 llvm-18 clang zlib1g-dev
+          curl -fsSL -o ghdl.tgz "https://github.com/ghdl/ghdl/releases/download/v${GHDL_VERSION}/ghdl-llvm-${GHDL_VERSION}-ubuntu24.04-x86_64.tar.gz"
+          mkdir -p "$HOME/ghdl" && tar -xzf ghdl.tgz -C "$HOME/ghdl" --strip-components=1
+          echo "$HOME/ghdl/bin" >> "$GITHUB_PATH"
+
+      - name: Install NVC
+        if: matrix.simulator == 'nvc'
+        run: |
+          curl -fsSL -o nvc.deb "https://github.com/nickg/nvc/releases/download/r${NVC_VERSION}/nvc_${NVC_VERSION}-1_amd64_ubuntu-24.04.deb"
+          sudo apt-get update
+          sudo apt-get install -y ./nvc.deb
+
+      # The virtual environment is used without activating it, which VCST supports
+      - name: Install VCST
+        run: |
+          python -m venv "$HOME/venv"
+          "$HOME/venv/bin/python" -m pip install --upgrade pip
+          "$HOME/venv/bin/python" -m pip install "vunit-hdl==${{ matrix.vunit }}" "cocotb==${{ matrix.cocotb }}" .
+
+      - name: Run tests
+        run: |
+          "$HOME/venv/bin/python" tests/vhdl/cocotb_examples/run.py -p 4 --clean
+          "$HOME/venv/bin/python" tests/vhdl/vunit_and_cocotb/run.py -p 4 --clean
+          "$HOME/venv/bin/python" tests/vhdl/parameterize_test/run.py -p 4 --clean
+          "$HOME/venv/bin/python" tests/vhdl/test_outcomes/run.py -p 4 --clean
+          "$HOME/venv/bin/python" tests/vhdl/isolation/run.py -p 8 --clean
+          "$HOME/venv/bin/python" tests/vhdl/front_end/check.py -p 4

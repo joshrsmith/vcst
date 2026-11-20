@@ -1,10 +1,11 @@
 import cocotb
+import vcst
 from vcst.utils import set_top_level
 from cocotb.triggers import RisingEdge, Timer
 from cocotb.clock import Clock
 from cocotb.result import TestSuccess, TestFailure
 
-@cocotb.test()
+@vcst.test(attributes=[".reset"])
 async def reset_test(dut):
     clock = Clock(dut.clock, 4, units="ns")
     cocotb.fork((clock.start()))
@@ -34,7 +35,7 @@ async def count_test(dut):
     dut.enable <= 1
     await RisingEdge(dut.clock)
 
-    counter_wrap = dut.COUNTER_WRAP.value
+    counter_wrap = int(dut.COUNTER_WRAP.value)
     for i in range(counter_wrap):
         if dut.counter_value.value != i:
             raise TestFailure(f"Counter value was incorrect. Expected: {i}. Actual: {dut.counter_value.value}")
@@ -55,7 +56,7 @@ async def wrap_test(dut):
     dut.enable <= 1
     await RisingEdge(dut.clock)
 
-    counter_wrap = dut.COUNTER_WRAP.value
+    counter_wrap = int(dut.COUNTER_WRAP.value)
     for i in range(counter_wrap):
         await RisingEdge(dut.clock)
 

@@ -1,81 +1,77 @@
-from typing import Optional, Set, Union
-from pathlib import Path
-from fnmatch import fnmatch
-from types import ModuleType
+import inspect
+from typing import Optional
 
-from vunit import VUnit 
-from vunit.color_printer import COLOR_PRINTER, NO_COLOR_PRINTER
-from vunit.database import PickledDataBase, DataBase
-from vunit.sim_if.factory import SIMULATOR_FACTORY
-from vunit.sim_if import SimulatorInterface
-from vunit.vhdl_standard import VHDL, VHDLStandard
-from vunit.ui.common import LOGGER, TEST_OUTPUT_PATH, select_vhdl_standard, check_not_empty
-from vunit.test.bench_list import TestBenchList
-from vunit.builtins import Builtins
+import cocotb
+from vunit import VUnit
 
 from .library import VCSTLibrary
-from ..project import VCSTProject
+from ..utils.compat import COCOTB_SUPPORTS_NVC
 from ..utils.mod_utils import import_mod
 
+# VUnit 4.x adds the VHDL builtins unless compile_builtins=False, VUnit 5 only when asked to
+_VUNIT_HAS_COMPILE_BUILTINS = "compile_builtins" in inspect.signature(VUnit.__init__).parameters
+
 class VCST(VUnit):
-    def __init__(
-        self,
+    # Set while VUnit.from_argv creates the object with from_args, see from_argv
+    _builtins_added_by_from_argv = False
+
+    @classmethod
+    def from_argv(
+        cls,
+        argv=None,
+        compile_builtins: Optional[bool] = True,
+        vhdl_standard: Optional[str] = None,
+    ):
+        """
+        Create VCST instance from command line arguments.
+
+        :param argv: Use explicit argv instead of actual command line argument
+        :param compile_builtins: Add VUnit's VHDL builtins, as done by add_vhdl_builtins
+        :param vhdl_standard: The VHDL standard used to compile files,
+                              if None the VUNIT_VHDL_STANDARD environment variable is used
+        """
+        # VUnit.from_argv creates the object with from_args, but VUnit 5 sets up what selecting the simulator,
+        # and thereby adding the builtins, needs after that. Hence the builtins are added here instead.
+        cls._builtins_added_by_from_argv = True
+        try:
+            if _VUNIT_HAS_COMPILE_BUILTINS:
+                vcst_obj = super().from_argv(argv=argv, compile_builtins=False, vhdl_standard=vhdl_standard)
+            else:
+                vcst_obj = super().from_argv(argv=argv, vhdl_standard=vhdl_standard)
+        finally:
+            cls._builtins_added_by_from_argv = False
+
+        if compile_builtins:
+            vcst_obj.add_vhdl_builtins()
+        return vcst_obj
+
+    @classmethod
+    def from_args(
+        cls,
         args,
         compile_builtins: Optional[bool] = True,
         vhdl_standard: Optional[str] = None,
     ):
-        self._args = args
-        self._configure_logging(args.log_level)
-        self._output_path = str(Path(args.output_path).resolve())
+        """
+        Create VCST instance from args namespace.
 
-        if args.no_color:
-            self._printer = NO_COLOR_PRINTER
+        :param args: The parsed argument namespace object
+        :param compile_builtins: Add VUnit's VHDL builtins, as done by add_vhdl_builtins
+        :param vhdl_standard: The VHDL standard used to compile files,
+                              if None the VUNIT_VHDL_STANDARD environment variable is used
+        """
+        vcst_obj = cls(args, vhdl_standard=vhdl_standard)
+        if compile_builtins and not cls._builtins_added_by_from_argv:
+            vcst_obj.add_vhdl_builtins()
+        return vcst_obj
+
+    def __init__(self, args, vhdl_standard: Optional[str] = None):
+        # Builtins are added by from_argv/from_args, the same way for all VUnit versions
+        if _VUNIT_HAS_COMPILE_BUILTINS:
+            super().__init__(args, compile_builtins=False, vhdl_standard=vhdl_standard)
         else:
-            self._printer = COLOR_PRINTER
+            super().__init__(args, vhdl_standard=vhdl_standard)
 
-        def test_filter(name, attribute_names):
-            keep = any(fnmatch(name, pattern) for pattern in args.test_patterns)
-
-            if args.with_attributes is not None:
-                keep = keep and set(args.with_attributes).issubset(attribute_names)
-
-            if args.without_attributes is not None:
-                keep = keep and set(args.without_attributes).isdisjoint(attribute_names)
-            return keep
-
-        self._test_filter = test_filter
-        self._vhdl_standard: VHDLStandard = select_vhdl_standard(vhdl_standard)
-
-        self._external_preprocessors = []  # type: ignore
-        self._location_preprocessor = None
-        self._check_preprocessor = None
-
-        self._simulator_class = SIMULATOR_FACTORY.select_simulator()
-
-        # Use default simulator options if no simulator was present
-        if self._simulator_class is None:
-            simulator_class = SimulatorInterface
-            self._simulator_output_path = str(Path(self._output_path) / "none")
-        else:
-            simulator_class = self._simulator_class
-            self._simulator_output_path = str(
-                Path(self._output_path) / simulator_class.name
-            )
-
-        self._create_output_path(args.clean)
-
-        database = self._create_database()
-        self._project = VCSTProject(
-            database=database,
-            depend_on_package_body=simulator_class.package_users_depend_on_bodies,
-        )
-
-        self._test_bench_list = TestBenchList(database=database)
-
-        self._builtins = Builtins(self, self._vhdl_standard, simulator_class)
-        if compile_builtins:
-            self.add_builtins()
-    
     def library(self, library_name: str):
         """
         Get a library
@@ -88,7 +84,7 @@ class VCST(VUnit):
         return VCSTLibrary(library_name, self, self._project, self._test_bench_list)
 
 
-    def add_cocotb_testbench(self, cocotb_module_location, cocotb_module=None):        
+    def add_cocotb_testbench(self, cocotb_module_location, cocotb_module=None):
         """Adds a cocotb module to a library based on variables defined in the cocotb module."""
         top_level = None
         top_level_type = None
@@ -105,12 +101,12 @@ class VCST(VUnit):
         if hasattr(cocotb_module, "top_level_type"):
             top_level_type = getattr(cocotb_module, "top_level_type")
         else:
-            raise RuntimeError(f"top_level not defined in cocotb module {cocotb_module}")
+            raise RuntimeError(f"top_level_type not defined in cocotb module {cocotb_module}")
 
         if hasattr(cocotb_module, "top_level_library"):
             top_level_library = getattr(cocotb_module, "top_level_library")
         else:
-            raise RuntimeError(f"top_level_library not defined in cocotb module {cocotb_module}")            
+            raise RuntimeError(f"top_level_library not defined in cocotb module {cocotb_module}")
 
         if not isinstance(top_level, str):
             raise RuntimeError(f"top_level defined in cocotb module should be a string {cocotb_module}")
@@ -121,12 +117,16 @@ class VCST(VUnit):
         if not isinstance(top_level_library, str):
             raise RuntimeError(f"top_level_library defined in cocotb module should be a string {cocotb_module}")
 
-        if top_level_type != "entity" or not top_level_type != "module":
+        if top_level_type not in ("entity", "module"):
             raise RuntimeError(f"Invalid top level type {top_level_type} in cocotb module {cocotb_module} specified. Please specify either entity or module.")
-        
+
+        simulator_class = self._simulator_class
+        if simulator_class is not None and simulator_class.name == "nvc" and not COCOTB_SUPPORTS_NVC:
+            raise RuntimeError(f"NVC needs cocotb 1.9 or later, cocotb {cocotb.__version__} is installed")
+
         library = self.library(top_level_library)
         top_level_design_unit = None
-        
+
         if top_level_type == "entity":
             top_level_design_unit = library.entity(top_level, test_bench=False)
         else:
