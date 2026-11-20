@@ -151,6 +151,26 @@ if VUNIT_HAS_SEEDS:
           results[0] is not None and results[0] == results[1], str(results))
     check("a different VUnit --seed gives different cocotb random values",
           results[0] is not None and results[2] is not None and results[0][1] != results[2][1], str(results))
+    test_output = tests.get("lib.front_end_dut.random_values", ("", ""))[1] or ""
+    check("the VUnit seed of a cocotb test is printed, as for VUnit tests",
+          "Seed for lib.front_end_dut.random_values: fedcba9876543210" in test_output, output)
+
+    #The seed simulation option can be any string
+    results = []
+    for name, seed in (("seed_option_a", "any seed"), ("seed_option_a_again", "any seed"), ("seed_option_b", "other")):
+        _, output, tests = run(name, "run_from_args.py", "--require-custom", "--seed-option", seed,
+                               "lib.front_end_dut.random_values")
+        results.append(random_values(tests))
+    check("the same seed simulation option gives the same cocotb random values",
+          results[0] is not None and results[0] == results[1], str(results))
+    check("a different seed simulation option gives different cocotb random values",
+          results[0] is not None and results[2] is not None and results[0][1] != results[2][1], str(results))
+    #A decimal seed, e.g. one reported by cocotb, is given to cocotb as it is
+    _, output, tests = run("seed_option_decimal", "run_from_args.py", "--require-custom", "--seed-option", "12345",
+                           "lib.front_end_dut.random_values")
+    test_output = tests.get("lib.front_end_dut.random_values", ("", ""))[1] or ""
+    check("a decimal seed simulation option is the cocotb seed",
+          re.search(r"Seeding Python random module with (supplied seed )?12345\b", test_output) is not None, output)
 
     #--seed repeat repeats the seeds of the previous run, kept by VUnit in the output path
     _, output, tests = run("seed_repeat", "run_from_argv.py", "lib.front_end_dut.random_values")

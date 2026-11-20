@@ -1,4 +1,6 @@
+import hashlib
 import os
+import re
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
@@ -156,6 +158,9 @@ class CocoTestRun(TestRun):
 
     def _simulate(self, output_path, seed=None):
         """Runs the simulation with the environment variables and simulator flags cocotb needs."""
+        if seed is not None:
+            # As VUnit 5 does for its own tests
+            print(f"Seed for {self._test_suite_name}: {seed}")
         config = self._config.copy()
         env = self.create_environ(output_path, seed)
         self.configure_simulator(config, env)
@@ -207,12 +212,15 @@ def get_result_file_name(output_path):
 
 def _get_cocotb_seed(seed):
     """
-    Returns the VUnit seed as a cocotb seed (32 bit integer), or None if there is no seed. VUnit seeds are
-    hexadecimal strings unless set by the user.
+    Returns the VUnit seed as a cocotb seed (integer), or None if there is no seed. VUnit generates seeds of 16
+    hexadecimal digits, which become 32 bit integers, but the seed simulation option can be any string: a decimal
+    number, such as a seed reported by cocotb, is used as it is, and any other string is hashed.
     """
     if seed is None:
         return None
-    try:
-        return int(str(seed), 16) % 2**32
-    except ValueError:
-        return None
+    seed = str(seed)
+    if re.fullmatch("[0-9a-fA-F]{16}", seed):
+        return int(seed, 16) % 2**32
+    if re.fullmatch("[0-9]+", seed):
+        return int(seed)
+    return int.from_bytes(hashlib.blake2b(seed.encode(), digest_size=4).digest(), "big")
