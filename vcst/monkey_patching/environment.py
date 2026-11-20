@@ -20,7 +20,10 @@ def get_extra_env():
 
 @contextmanager
 def extra_env(env):
-    """Adds env to the environment of the processes started by this thread within the context."""
+    """
+    Adds env to the environment of the processes started by this thread within the context. Variables whose value
+    is None are removed.
+    """
     _extra_env.env = env
     try:
         yield
@@ -34,6 +37,7 @@ def _init_with_extra_env(self, args, cwd=None, env=None):
     if extra:
         env = dict(os.environ if env is None else env)
         env.update(extra)
+        env = {name: value for name, value in env.items() if value is not None}
     _process_init(self, args, cwd=cwd, env=env)
 
 Process.__init__ = _init_with_extra_env

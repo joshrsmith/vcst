@@ -57,7 +57,10 @@ class CocoTestRun(TestRun):
         self._vhdl = vhdl
 
     def create_environ(self, output_path, seed=None):
-        """Creates the environment variables cocotb needs, in addition to those of the VCST process."""
+        """
+        Creates the environment variables cocotb needs, in addition to those of the VCST process, None for those to
+        remove from it.
+        """
         environ = gpi_environ(os.environ)
         mod_dir, mod_name = os.path.split(self._cocotb_module_location)
 

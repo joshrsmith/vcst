@@ -24,6 +24,10 @@ def set_env_var(self, env):
     C_MAX_CHARS = 1024
     process = self._process()
     for var, var_value in env.items():
+        if var_value is None:
+            process.writeline(f"unset -nocomplain ::env({var})")
+            continue
+
         #Initialize a temp variable to hold the intermediate value
         process.writeline('set vcst_env_var ""')
 

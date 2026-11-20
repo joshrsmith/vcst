@@ -126,6 +126,13 @@ if sys.prefix != sys.base_prefix:
 else:
     print("skip check of an unactivated virtual environment: not run in a virtual environment")
 
+#cocotb 2.x refuses to run if COCOTB_TESTCASE is set as well as COCOTB_TEST_FILTER, which VCST selects tests with
+if COCOTB2:
+    rc, output, tests = run("cocotb_testcase", "run_from_argv.py", "lib.front_end_dut.untagged",
+                            env={"COCOTB_TESTCASE": "tagged"})
+    check("a COCOTB_TESTCASE set by the user doesn't change which test runs",
+          rc == 0 and tests.get("lib.front_end_dut.untagged", ("",))[0] == "passed", output)
+
 #Random seeds
 seed_variable = "COCOTB_RANDOM_SEED" if COCOTB2 else "RANDOM_SEED"
 _, output, tests = run("user_seed", "run_from_argv.py", "lib.front_end_dut.random_values", env={seed_variable: "12345"})

@@ -64,7 +64,7 @@ def find_cocotb_tests(module):
 def test_selection_environ(module_name, test_names, top_level, seed, test_modules=None):
     """
     Returns the environment variables selecting the module, tests (names used to select tests), top level and
-    random seed (None to let cocotb choose) of a cocotb run. test_modules maps the names of tests defined in other
+    random seed (None to let cocotb choose) of a cocotb run, None for variables to remove. test_modules maps the names of tests defined in other
     modules to the names of these modules.
     """
     test_modules = test_modules or {}
@@ -75,6 +75,8 @@ def test_selection_environ(module_name, test_names, top_level, seed, test_module
                 f"^{re.escape(test_modules.get(name) or module_name)}\\.{re.escape(name)}$" for name in test_names
             ),
             "COCOTB_TOPLEVEL": top_level,
+            # Removed, as cocotb refuses to run if it is set as well as COCOTB_TEST_FILTER
+            "COCOTB_TESTCASE": None,
         }
         if seed is not None:
             environ["COCOTB_RANDOM_SEED"] = str(seed)
