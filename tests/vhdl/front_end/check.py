@@ -2,10 +2,12 @@
 Checks the VCST command line and run script interface, which differs between VUnit 4.7 and 5, by running the run
 scripts of this directory with different arguments.
 
-Usage: python check.py [-p N]
+Usage: python check.py [-p N] [--output-path DIR]
 
-Runs with the simulator selected by VUNIT_SIMULATOR, like the run scripts, and exits with 1 if a check fails.
+Runs with the simulator selected by VUNIT_SIMULATOR, like the run scripts, and exits with 1 if a check fails. The
+output of the runs is written to DIR, by default a new temporary directory.
 """
+import argparse
 import json
 import os
 import re
@@ -26,9 +28,15 @@ VUNIT_HAS_SEEDS = hasattr(TestRun, "get_seed")
 ALL_TESTS = {"lib.tb_front_end.vhdl_test", "lib.front_end_dut.tagged", "lib.front_end_dut.untagged",
              "lib.front_end_dut.random_values"}
 
+parser = argparse.ArgumentParser(description="Checks the VCST command line and run script interface")
+parser.add_argument("-p", "--num-threads", type=int, default=1, help="threads of the runs")
+parser.add_argument("--output-path", type=Path, help="directory of the output of the runs")
+options = parser.parse_args()
+
 failures = []
-work = Path(tempfile.mkdtemp(prefix="vcst_front_end_"))
-parallel = sys.argv[1:]
+work = options.output_path or Path(tempfile.mkdtemp(prefix="vcst_front_end_"))
+work.mkdir(parents=True, exist_ok=True)
+parallel = ["-p", str(options.num_threads)]
 
 
 def run(name, script, *args, env=None):
@@ -38,6 +46,8 @@ def run(name, script, *args, env=None):
     """
     output_path = work / name
     xunit = output_path / "xunit.xml"
+    #Not to read the report of an earlier check with the same output path
+    xunit.unlink(missing_ok=True)
     command = [sys.executable, str(ROOT / script), "--output-path", str(output_path), "--xunit-xml", str(xunit),
                *parallel, *args]
     run_env = {**os.environ, **(env or {})}
@@ -106,6 +116,7 @@ rc, output, _ = run("list", "run_from_argv.py", "--list")
 check("--list lists the cocotb tests", rc == 0 and all(name in output for name in ALL_TESTS), output)
 
 json_file = work / "export.json"
+json_file.unlink(missing_ok=True)
 rc, output, _ = run("export_json", "run_from_argv.py", "--export-json", str(json_file))
 exported = {}
 if json_file.exists():
