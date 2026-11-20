@@ -5,7 +5,8 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 
 from vunit.test.report import PASSED, SKIPPED, FAILED
-from vunit.test.suites import IndependentSimTestCase, TestRun
+from vunit.ostools import write_file
+from vunit.test.suites import IndependentSimTestCase, TestRun, get_result_file_name as get_vunit_result_file_name
 
 from ..monkey_patching.environment import extra_env
 from ..utils.compat import gpi_environ, gpi_lib, seed_variable, test_selection_environ
@@ -137,6 +138,11 @@ class CocoTestRun(TestRun):
         result_file_name = get_result_file_name(output_path)
         if os.path.exists(result_file_name):
             os.remove(result_file_name)
+
+        # The run scripts of VUnit's vsim based simulators read VUnit's results file after the simulation, and report
+        # the run as failed unless the test suite is done. The cocotb results file gives the outcome of the tests,
+        # so the test suite is marked done.
+        write_file(get_vunit_result_file_name(output_path), "test_suite_done\n")
 
         sim_ok = self._simulate(output_path, seed)
 
