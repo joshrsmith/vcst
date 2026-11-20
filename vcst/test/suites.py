@@ -175,12 +175,12 @@ class CocoTestRun(TestRun):
             if test_name not in results:
                 continue
             results_tests.append(test_name)
+            # A test skipped while it runs (pytest.skip with cocotb 2.1) passes, as VUnit counts a test it runs
+            # as failed unless it passed
             results[test_name] = PASSED
             for thing in result:
                 if thing.tag in ("failure", "error"):
                     results[test_name] = FAILED
-                elif thing.tag == "skipped":
-                    results[test_name] = SKIPPED
 
         for test_name in self._test_cases:
             if test_name not in results_tests:

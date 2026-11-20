@@ -97,7 +97,14 @@ if hasattr(cocotb, "xfail"):
     async def xfail_not_raised(dut):
         await run_alone("xfail_not_raised")
 
-    expect("passed", "xfail_raised")
+    #Passes, as a VUnit test that runs either passes or fails, and failing would fail the run
+    @cocotb.test()
+    async def skipped_at_runtime(dut):
+        import pytest  # A dependency of cocotb 2.1
+        await run_alone("skipped_at_runtime")
+        pytest.skip("expected skip")
+
+    expect("passed", "xfail_raised", "skipped_at_runtime")
     expect("failed", "xfail_not_raised")
 
 #Tests defined in another module, which cocotb names after that module
