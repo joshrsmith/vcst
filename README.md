@@ -10,13 +10,20 @@ VCST seeks to combine the best of both worlds. This includes inheriting VUnit's 
 ## Goals
 The goal of VCST is to provide a proof of example concept of VUnit and Cocotb working together without a single source change to other project. This will provide a couple of benefits. First, it is an interim solutions for VUnit and Cocotb users. Second, it will shed some light on what works could be done to make cooctb and vunit even more modular. Third, it has given me an opportunity to dig more into how these tools work so I can contribute more to these amazing tools.
 
-## Simulator Support
-At the moment, the supported simulators are GHDL, NVC, Riviera-Pro and ModelSim/Questa. The tests in this repository are run with GHDL and NVC; Riviera-Pro and ModelSim/Questa have not been tested with the current versions of VUnit and cocotb. GHDL has very limited support for VPI and therefore Cocotb can't fully utilize it. I invite anyone who wants to help me broaden simulator support to contribute. I also intend to add support for Icarus as well. This is bigger effort as VUnit does not support Icarus (as it does not support enough of System Verilog). VUnit's SystemVerilog testbenches would not work, but cocotb testbenches could work. 
+## Compatibility
+VCST supports VUnit 4.7.1 and VUnit 5 (pre-release, tested with 5.0.0.dev16), and cocotb 1.8, 1.9, 2.0 and 2.1. Any of these VUnit versions can be combined with any of these cocotb versions, and CI tests every combination. The run script and the VCST interface are the same for all of them, but the cocotb test modules must be written for the installed cocotb version. For cocotb before 1.8 or VUnit before 4.7, use VCST 0.0.11 or earlier.
 
-## Supported Versions
-VCST works with cocotb 1.8 and 1.9 as well as cocotb 2.0 and later, and with VUnit 4.7.1 or later, including the upcoming VUnit 5. Any of these cocotb versions can be combined with any of these VUnit versions. The run script and the VCST interface are the same for all of them, so a project can move to cocotb 2 without changing how its tests are added and run. The cocotb test modules themselves need to be written for the cocotb version installed. NVC needs cocotb 1.9 or later. With VUnit 5, which needs Python 3.11 or later, cocotb 1.8 can be used with Python 3.11 and 3.12. Use VCST 0.0.11 or earlier with cocotb before 1.8 or VUnit before 4.7.
+| Simulator       | Status                | Notes                                                                  |
+|-----------------|-----------------------|------------------------------------------------------------------------|
+| GHDL            | Tested in CI          | GHDL's VPI support is limited, so cocotb can't use everything with it  |
+| NVC             | Tested in CI          | Needs cocotb 1.9 or later                                              |
+| Riviera-PRO     | Supported, not tested | Not run with the current versions of VUnit and cocotb; reports welcome |
+| ModelSim/Questa | Supported, not tested | Same as Riviera-PRO                                                    |
 
-The tests in this repository have a cocotb 1.x version (the `cocotb1` directories) and a cocotb 2.x version (the `cocotb2` directories) of each cocotb test module. The run scripts pick the one matching the installed cocotb, see `vcst.utils.compat.COCOTB2`. The CI workflow runs them with every supported combination of VUnit and cocotb, on GHDL and NVC (cocotb 1.8 on GHDL only):
+I invite anyone who wants to help me broaden simulator support to contribute. I also intend to add support for Icarus as well. This is bigger effort as VUnit does not support Icarus (as it does not support enough of System Verilog). VUnit's SystemVerilog testbenches would not work, but cocotb testbenches could work.
+
+## Tests
+The tests in this repository have a cocotb 1.x version (the `cocotb1` directories) and a cocotb 2.x version (the `cocotb2` directories) of each cocotb test module. The run scripts pick the one matching the installed cocotb, see `vcst.utils.compat.COCOTB2`. The CI workflow runs them with every combination of VUnit and cocotb, on GHDL and NVC (cocotb 1.8 on GHDL only):
 
 - `tests/vhdl/cocotb_examples`, `vunit_and_cocotb` and `parameterize_test`: example test benches, including VUnit and cocotb tests of the same design.
 - `tests/vhdl/test_outcomes`: tests with known outcomes, many of them failures, such as failing assertions, exceptions, tests failing to start, timeouts, `expect_fail` and `expect_error`, and tests that have names that are suffixes of other test names, are parametrized or are generated. The run script passes only if every test is reported with its expected outcome. Also covers `pre_config` and `post_check`.
