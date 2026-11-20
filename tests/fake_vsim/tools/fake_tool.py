@@ -25,6 +25,9 @@ elif tool == "vsim":
     do = args[args.index("-do") + 1]
     prelude = (HERE / "prelude.tcl").read_text().replace("@FAKE_COCOTB@", str(HERE / "fake_cocotb.py"))
     script = prelude + (f"source {{{do}}}\n" if os.path.isfile(do) else do + "\n")
+    if "-c" not in args:
+        # The graphical user interface, in which the user starts the simulation with vunit_run
+        script += "vunit_run\n"
     file_descriptor, script_name = tempfile.mkstemp(prefix="fake_vsim_", suffix=".tcl")
     with os.fdopen(file_descriptor, "w") as script_file:
         script_file.write(script)

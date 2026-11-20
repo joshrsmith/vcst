@@ -24,6 +24,10 @@ proc quit {args} {
     exit $code
 }
 
+proc echo {args} {
+    puts [join $args " "]
+}
+
 # Other simulator commands have no effect
 proc unknown {args} {
     return ""

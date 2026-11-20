@@ -19,4 +19,9 @@ names.add_config(name="generics", generics={"WIDTH": 16, "LABEL": "hello", "FILE
                                              "ADDRS": ['x"0000"', 'X"0100"', '16x"ab"']})
 verilog = ui.add_cocotb_testbench(cocotb_tests / "test_verilog")
 verilog.add_config(name="parameters", generics={"NAME": "hello", "COUNT": 3})
+
+#Flags used instead of vsim_flags in GUI mode, which check.py looks for
+simulator = os.environ.get("VUNIT_SIMULATOR")
+if simulator in ("rivierapro", "modelsim"):
+    ui.set_sim_option(f"{simulator}.vsim_flags.gui", ["-fake_gui_flag"])
 ui.main()

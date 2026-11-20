@@ -71,6 +71,10 @@ top_level = env.get("COCOTB_TOPLEVEL" if cocotb2 else "TOPLEVEL", "")
 check(top_level and any(top_level.lower() in arg.lower() for arg in load_args),
       f"top level {top_level!r} is not loaded: {load_args}")
 
+# cocotb 2.x refuses to run when both are set
+if cocotb2:
+    check("COCOTB_TESTCASE" not in env, "COCOTB_TESTCASE is set as well as COCOTB_TEST_FILTER")
+
 # The tests selected, as cocotb selects them
 module_name = env.get("COCOTB_TEST_MODULES" if cocotb2 else "MODULE", "")
 selected = []
@@ -88,7 +92,7 @@ try:
             elif isinstance(obj, generators):
                 tests.extend(obj.generate_tests())
         test_filter = re.compile(env.get("COCOTB_TEST_FILTER", ""))
-        selected = [test.name for test in tests if test_filter.search(f"{module_name}.{test.name}")]
+        selected = [test.name for test in tests if test_filter.search(test.fullname)]
     else:
         from cocotb.decorators import test as Test
         for name in env.get("TESTCASE", "").split(","):

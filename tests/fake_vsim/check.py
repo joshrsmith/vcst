@@ -54,12 +54,16 @@ def check(description, condition, details=""):
 
 
 def run(work, flavor, bin_dir, name, *args):
-    """Runs project/run.py, returns (exit code, output, {test: outcome}, log entries of the fake cocotb)."""
+    """
+    Runs project/run.py, returns (exit code, output, {test: outcome}, log entries of the fake cocotb, output of the
+    tests).
+    """
     output_path = work / f"{flavor}_{name}"
     xunit = output_path / "xunit.xml"
     log = output_path / "fake.log"
     output_path.mkdir()
-    env = {**simulator_env(flavor, bin_dir), "FAKE_LOG": str(log)}
+    #COCOTB_TESTCASE as left by running cocotb's makefiles, which VCST must not pass on to cocotb 2.x
+    env = {**simulator_env(flavor, bin_dir), "FAKE_LOG": str(log), "COCOTB_TESTCASE": "plain"}
     proc = subprocess.run([sys.executable, str(ROOT / "project" / "run.py"), "--output-path", str(output_path),
                            "--xunit-xml", str(xunit), *args], capture_output=True, text=True, env=env)
     tests = {}
@@ -70,7 +74,8 @@ def run(work, flavor, bin_dir, name, *args):
     entries = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
     #The entries of the fake cocotb, leaving out those of the fake tools
     entries = [entry for entry in entries if "load" in entry]
-    return proc.returncode, proc.stdout + proc.stderr, tests, entries
+    test_output = "".join(path.read_text() for path in sorted((output_path / "test_output").glob("*/output.txt")))
+    return proc.returncode, proc.stdout + proc.stderr, tests, entries, test_output
 
 
 def main():
@@ -88,13 +93,20 @@ def main():
         check(f"{flavor}: tests are listed", len(all_tests) > 2, listed.stdout + listed.stderr)
 
         for name, args in (("persistent_one_thread", ["-p", "1"]), ("persistent", ["-p", "3"]),
-                           ("unique_sim", ["-p", "3", "--unique-sim"])):
-            rc, output, tests, entries = run(work, flavor, bin_dir, name, *args)
+                           ("unique_sim", ["-p", "3", "--unique-sim"]), ("gui", ["-g"])):
+            rc, output, tests, entries, test_output = run(work, flavor, bin_dir, name, *args)
             problems = [problem for entry in entries for problem in entry["problems"]]
             check(f"{flavor} ({name}): every test passes with what it needs", rc == 0 and set(tests) == all_tests
                   and all(outcome == "passed" for outcome in tests.values()) and not problems,
                   "\n".join(problems) + "\n" + output)
             check(f"{flavor} ({name}): every test is loaded once", len(entries) == len(all_tests), output)
+            #VUnit's vunit_run reads VUnit's results file, and reports the run as failed unless the file says the
+            #test suite is done
+            check(f"{flavor} ({name}): VUnit's run script finds the test suite done",
+                  "Test Run Failed!" not in test_output and "vunit_results" not in test_output, test_output[-3000:])
+            if name == "gui":
+                check(f"{flavor} ({name}): the vsim_flags.gui of the user are given to vsim",
+                      entries and all("-fake_gui_flag" in entry["load"] for entry in entries), output)
             if flavor == "rivierapro":
                 #Generics of a VHDL top level are passed on as written, as VUnit does, with lists becoming aggregates.
                 #Strings given to a Verilog top level are quoted.
