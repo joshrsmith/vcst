@@ -7,5 +7,5 @@ setup(name='vcst',
       author_email="jpwice100@gmail.com",
       packages=find_packages(),
       python_requires=">=3.9",
-      install_requires=["vunit-hdl>=4.7.1,<6", "cocotb>=1.8,<2"]
+      install_requires=["vunit-hdl>=4.7.1,<6", "cocotb>=1.8,<3"]
      )

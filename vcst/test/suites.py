@@ -68,6 +68,9 @@ class CocoTestRun(TestRun):
 
         if self._simulator_if.name == "ghdl":
             top_level = self._top_level.lower()
+            # As done by cocotb's runner for this simulator. Ignored by cocotb 1.x.
+            if "COCOTB_TRUST_INERTIAL_WRITES" not in os.environ:
+                environ["COCOTB_TRUST_INERTIAL_WRITES"] = "1"
         else:
             top_level = self._top_level
 
@@ -167,7 +170,7 @@ class CocoTestRun(TestRun):
             results_tests.append(test_name)
             results[test_name] = PASSED
             for thing in result:
-                if thing.tag == "failure":
+                if thing.tag in ("failure", "error"):
                     results[test_name] = FAILED
                 elif thing.tag == "skipped":
                     results[test_name] = SKIPPED

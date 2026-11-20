@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         vunit: ["4.7.1", "5.0.0.dev16"]
-        cocotb: ["1.8.1", "1.9.2"]
+        cocotb: ["1.8.1", "1.9.2", "2.0.1", "2.1.0"]
         simulator: [ghdl]
     env:
       GHDL_VERSION: "6.0.0"
