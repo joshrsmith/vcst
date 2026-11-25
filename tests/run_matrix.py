@@ -169,6 +169,17 @@ def duration(seconds):
     minutes, seconds = divmod(round(seconds), 60)
     return f"{minutes}:{seconds:02}"
 
+def python_incompatibility(log_path):
+    """
+    Returns why a version couldn't be installed if pip says it requires another Python than the one running this
+    script, else None. Such a combination isn't supported by this Python, which isn't a failure of VCST.
+    """
+    marker = "Ignored the following versions that require a different python version:"
+    for line in Path(log_path).read_text(errors="replace").splitlines():
+        if marker in line:
+            return f"needs another Python than {platform.python_version()} ({line.split(marker, 1)[1].strip()})"
+    return None
+
 def copy_vcst(destination):
     """
     Copies what is needed to install VCST, so that building it leaves the checkout unchanged, and the same VCST is
@@ -364,8 +375,13 @@ def main():
             start = time.monotonic()
             python = install(output / "venvs" / name, vunit, cocotb, vcst_source, install_log)
             if python is None:
-                combination.update(status="install failed", install_log=str(install_log))
-                print(f"  installation failed, see {install_log}")
+                reason = python_incompatibility(install_log)
+                if reason:
+                    combination.update(status="unsupported", reason=reason)
+                    print(f"  not run: {reason}")
+                else:
+                    combination.update(status="install failed", install_log=str(install_log))
+                    print(f"  installation failed, see {install_log}")
                 continue
             print(f"  installed in {duration(time.monotonic() - start)}")
 
@@ -413,11 +429,25 @@ def main():
             print_log_end(run_result["log"])
     total = sum(len(c["runs"]) for c in summary["combinations"])
     skipped = sum(run["result"] == "skip" for c in summary["combinations"] for run in c["runs"])
-    skipped_text = f", {skipped} skipped" if skipped else ""
-    print(f"\n{total - skipped - len(failed)} of {total - skipped} runs passed{skipped_text}. Report: {output / 'report.md'}")
+    executed = total - skipped
+    not_run = sum(c["status"] == "unsupported" for c in summary["combinations"])
+    plural = lambda count, noun: f"{count} {noun}{'s' if count != 1 else ''}"
+    if failed or failed_installs:
+        problems_found = ([f"{len(failed)} of {plural(executed, 'run')} failed"] if failed else []) + (
+            [f"{plural(len(failed_installs), 'installation')} failed"] if failed_installs else [])
+        verdict = "FAIL, " + " and ".join(problems_found)
+    elif executed == 0:
+        verdict = "NOTHING WAS RUN"
+    else:
+        verdict = f"PASS, all {plural(executed, 'run')} passed" if executed > 1 else "PASS, the run passed"
+    notes = [f"{skipped} skipped"] if skipped else []
+    if not_run:
+        notes.append(f"{not_run} of {len(pairs)} combinations not run")
+    print(f"\n{simulator} ({version}): {verdict}{' (' + ', '.join(notes) + ')' if notes else ''}. "
+          f"Report: {output / 'report.md'}")
     if summary.get("interrupted"):
         return 130
-    return 1 if failed or failed_installs else 0
+    return 1 if failed or failed_installs or executed == 0 else 0
 
 if __name__ == "__main__":
     sys.exit(main())

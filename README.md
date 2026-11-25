@@ -39,10 +39,11 @@ The tests in this repository have a cocotb 1.x version (the `cocotb1` directorie
 ```bash
 export VUNIT_SIMULATOR=rivierapro
 export VUNIT_RIVIERAPRO_PATH=/path/to/riviera-pro/bin
-python3 tests/run_matrix.py --output /path/to/results -p 4
+python3 tests/run_matrix.py --quick --output /path/to/results -p 4   # 4 combinations covering each version
+python3 tests/run_matrix.py --output /path/to/results -p 4           # all combinations
 ```
 
-Everything it creates is in the output directory (`matrix_out` by default) including virtual environments created during the run, console outputs and logs, and a report, `report.md`, which summarizes the results. See `--help` for all options. The `fake_vsim` suite doesn't use the simulator selected, so it is run by default only with GHDL (and skipped if tclsh isn't installed); `--suite fake_vsim` runs it with any simulator. CI runs the same script, one combination per job, with GHDL and NVC.
+Everything it creates is in the output directory (`matrix_out` by default) including virtual environments created during the run, console outputs and logs, and a report, `report.md`, which summarizes the results. At the end it prints one line saying whether all runs passed, and a combination which needs a newer Python than the one running the script (VUnit 5 needs Python 3.11 or later) is reported as not run. See `--help` for all options. The `fake_vsim` suite doesn't use the simulator selected, so it is run by default only with GHDL (and skipped if tclsh isn't installed); `--suite fake_vsim` runs it with any simulator. CI runs the same script, one combination per job, with GHDL and NVC.
 
 ## Disadvantages
 There are a few disadvantages compared to use either VUnit or Cocotb by themselves. These include:
