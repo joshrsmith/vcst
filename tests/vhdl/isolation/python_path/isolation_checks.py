@@ -6,10 +6,12 @@ This module is only found through the PYTHONPATH set by run.py, so importing it 
 """
 import os
 
+from vcst.utils.compat import COCOTB2
 
-def check_environment(dut, module_name, top_level, cocotb2):
+
+def check_environment(dut, module_name, top_level):
     """Checks the environment of a test of module_name, with top level top_level, in configuration id_<ID generic>."""
-    if cocotb2:
+    if COCOTB2:
         module_variable, top_level_variable = "COCOTB_TEST_MODULES", "COCOTB_TOPLEVEL"
     else:
         module_variable, top_level_variable = "MODULE", "TOPLEVEL"

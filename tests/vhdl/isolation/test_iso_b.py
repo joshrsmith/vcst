@@ -6,17 +6,17 @@ from isolation_checks import check_environment
 
 @cocotb.test()
 async def first(dut):
-    await Timer(1, unit="ns")
-    check_environment(dut, __name__, "iso_b", cocotb2=True)
+    await Timer(1, "ns")
+    check_environment(dut, __name__, "iso_b")
 
 @cocotb.test()
 async def second(dut):
-    await Timer(1, unit="ns")
-    check_environment(dut, __name__, "iso_b", cocotb2=True)
+    await Timer(1, "ns")
+    check_environment(dut, __name__, "iso_b")
 
 @cocotb.test()
 async def third(dut):
-    await Timer(1, unit="ns")
-    check_environment(dut, __name__, "iso_b", cocotb2=True)
+    await Timer(1, "ns")
+    check_environment(dut, __name__, "iso_b")
 
 set_top_level("iso_b", "entity", "lib")

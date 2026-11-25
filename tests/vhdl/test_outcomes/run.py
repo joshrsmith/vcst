@@ -32,7 +32,7 @@ def pre_config(output_path, seed=None):
 def post_check(output_path):
     return (Path(output_path) / "pre_config.txt").exists()
 
-hooks = ui.add_cocotb_testbench(cocotb_tests / "test_hooks")
+hooks = ui.add_cocotb_testbench(root / "test_hooks")
 hooks.add_config(name="hooks_pass", pre_config=pre_config, post_check=post_check)
 hooks.add_config(name="pre_config_fails", pre_config=lambda: False)
 hooks.add_config(name="post_check_fails", post_check=lambda: False)
