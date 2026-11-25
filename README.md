@@ -59,12 +59,9 @@ There are a few disadvantages compared to use either VUnit or Cocotb by themselv
     ```bash
     source path_to_virtual_environment/bin/activate
     ```
-3. ```bash
-    pip install wheel
-    ```
-4. Clone repository
-5. Change working directory to root of repository 
-6. ```bash
+3. Clone repository
+4. Change working directory to root of repository 
+5. ```bash
     pip install .
     ```
 

@@ -163,7 +163,8 @@ def copy_vcst(destination):
     """
     shutil.rmtree(destination, ignore_errors=True)
     shutil.copytree(ROOT / "vcst", destination / "vcst", ignore=shutil.ignore_patterns("__pycache__"))
-    shutil.copy2(ROOT / "setup.py", destination)
+    for name in ("pyproject.toml", "README.md", "LICENSE"):
+        shutil.copy2(ROOT / name, destination)
 
 def install(venv_dir, vunit, cocotb, vcst_source, log_path):
     """Installs a combination in a virtual environment, created if needed, returns its Python or None if it failed"""
