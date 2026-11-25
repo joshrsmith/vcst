@@ -16,7 +16,7 @@ lib.add_source_files(root / "hdl" / "*.vhd*", vhdl_standard="2008")
 ui.add_cocotb_testbench(cocotb_tests / "dff_cocotb")
 
 #Add configurations for the adder
-adder_tb = ui.add_cocotb_testbench(cocotb_tests / "test_adder")
+adder_tb = ui.add_cocotb_testbench(root / "test_adder")
 adder_tb.add_config(name="data_width_8", generics={"DATA_WIDTH": 8})
 adder_tb.add_config(name="data_width_16", generics={"DATA_WIDTH": 16})
 

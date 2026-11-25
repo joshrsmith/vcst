@@ -12,7 +12,7 @@ NAME_IDS = {8: 1, 16: 2, 4: 3}
 async def parameters(dut):
     width = len(dut.a)
     assert width in NAME_IDS, f"WIDTH {width} isn't one of the configurations"
-    await Timer(1, unit="ns")
+    await Timer(1, "ns")
     assert int(dut.name_id.value) == NAME_IDS[width], f"NAME doesn't match WIDTH {width}: name_id {int(dut.name_id.value)}"
 
 @cocotb.test()
@@ -23,7 +23,7 @@ async def adding(dut):
         b = random.randint(0, 2**width - 1)
         dut.a.value = a
         dut.b.value = b
-        await Timer(1, unit="ns")
+        await Timer(1, "ns")
         assert int(dut.sum.value) == a + b, f"{a} + {b} gave {int(dut.sum.value)}"
 
 set_top_level("params_dut", "module", "lib")
