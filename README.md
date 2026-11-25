@@ -17,8 +17,8 @@ VCST supports VUnit 4.7.1 and VUnit 5 (pre-release, tested with 5.0.0.dev16), an
 |-----------------|-----------------------|------------------------------------------------------------------------|
 | GHDL            | Tested in CI          | GHDL's VPI support is limited, so cocotb can't use everything with it  |
 | NVC             | Tested in CI          | Needs cocotb 1.9 or later                                              |
-| Riviera-PRO     | Supported, not tested | Not run with the current versions of VUnit and cocotb; reports welcome |
-| ModelSim/Questa | Supported, not tested | Same as Riviera-PRO                                                    |
+| Riviera-PRO     | Tested by hand        | Full `tests/run_matrix.py` run with Riviera-PRO 2026.04, all passed    |
+| ModelSim/Questa | Supported, not tested | Not run with the current versions of VUnit and cocotb; reports welcome |
 
 I invite anyone who wants to help me broaden simulator support to contribute. I also intend to add support for Icarus as well. This is bigger effort as VUnit does not support Icarus (as it does not support enough of System Verilog). VUnit's SystemVerilog testbenches would not work, but cocotb testbenches could work.
 
