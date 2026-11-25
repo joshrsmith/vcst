@@ -42,7 +42,7 @@ jobs:
         if: matrix.simulator == 'ghdl'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libgnat-13 llvm-18 clang zlib1g-dev
+          sudo apt-get install -y --no-install-recommends libgnat-13 llvm-18 clang zlib1g-dev tcl
           curl -fsSL -o ghdl.tgz "https://github.com/ghdl/ghdl/releases/download/v${GHDL_VERSION}/ghdl-llvm-${GHDL_VERSION}-ubuntu24.04-x86_64.tar.gz"
           mkdir -p "$HOME/ghdl" && tar -xzf ghdl.tgz -C "$HOME/ghdl" --strip-components=1
           echo "$HOME/ghdl/bin" >> "$GITHUB_PATH"

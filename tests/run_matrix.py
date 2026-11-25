@@ -38,6 +38,9 @@ QUICK = [("4.7.1", "1.8.1"), ("5.0.0.dev16", "1.9.2"), ("4.7.1", "2.0.1"), ("5.0
 #Simulators running all tests of a thread in one simulator process, unless --unique-sim is given
 REUSING_SIMULATORS = ["rivierapro", "modelsim"]
 
+#The simulator with which the suites not using the simulator are run by default, as CI has it
+INDEPENDENT_SUITES_SIMULATOR = "ghdl"
+
 @dataclass
 class Suite:
     """A test suite, a script exiting with 0 if all of its tests had their expected outcomes"""
@@ -50,6 +53,12 @@ class Suite:
     one_thread: bool = True
     #The simulators the suite is run with, None for all
     simulators: list = None
+    #Whether the suite doesn't use the simulator selected, so that running it once is enough. It is run by default only
+    #with INDEPENDENT_SUITES_SIMULATOR, so that the runs with a simulator needing a license take only what needs it, and
+    #with any simulator if selected with --suite
+    independent: bool = False
+    #Executables the suite needs, the suite is skipped if one isn't found
+    requires: list = field(default_factory=list)
 
 SUITES = [
     Suite("cocotb_examples", "vhdl/cocotb_examples/run.py"),
@@ -62,6 +71,8 @@ SUITES = [
     Suite("front_end", "vhdl/front_end/check.py", one_thread=False),
     #VCST loads cocotb on ModelSim/Questa through FLI, which supports VHDL only
     Suite("verilog", "verilog/run.py", simulators=["rivierapro"]),
+    #Riviera-PRO and ModelSim/Questa replaced by fake simulators, which need tclsh
+    Suite("fake_vsim", "fake_vsim/check.py", one_thread=False, independent=True, requires=["tclsh"]),
 ]
 
 #Commands printing the version of a simulator, the executable being looked for in VUNIT_<SIMULATOR>_PATH or PATH
@@ -122,6 +133,8 @@ def planned_runs(simulator, threads, suite_names):
         if suite_names and suite.name not in suite_names:
             continue
         if suite.simulators is not None and simulator not in suite.simulators:
+            continue
+        if suite.independent and not suite_names and simulator != INDEPENDENT_SUITES_SIMULATOR:
             continue
         for n in ([1] if suite.one_thread and threads != 1 else []) + [threads]:
             runs.append((f"{suite.name}-p{n}", suite, n))
@@ -254,7 +267,9 @@ def problems(summary):
         elif combination["status"] == "install failed":
             lines.append(f"{title}: installation failed, see {combination['install_log']}")
         for run in combination["runs"]:
-            if run["result"] != "pass":
+            if run["result"] == "skip":
+                lines.append(f"{title}, {run['name']}: skipped, {run['reason']}")
+            elif run["result"] != "pass":
                 lines.append(f"{title}, {run['name']}: {run['result']}, see {run['log']}")
     return lines
 
@@ -358,6 +373,14 @@ def main():
                 run_dir = results_dir / run_name
                 run_dir.mkdir()
                 log = run_dir / "console.log"
+                missing = [tool for tool in suite.requires if shutil.which(tool, path=env.get("PATH")) is None]
+                if missing:
+                    reason = f"{', '.join(missing)} not found"
+                    log.write_text(f"Skipped: {reason}\n")
+                    combination["runs"].append({"name": run_name, "result": "skip", "seconds": 0, "log": str(log),
+                                                "reason": reason})
+                    print(f"  {run_name:<26} skip     {reason}")
+                    continue
                 command = [str(python), str(ROOT / "tests" / suite.script), *suite.args, "-p", str(threads),
                            "--output-path", str(run_dir)]
                 start = time.monotonic()
@@ -377,7 +400,7 @@ def main():
     print("Columns: VUnit/cocotb")
     print(table(results_grid(summary, runs)))
     issues = problems(summary)
-    failed = [run for c in summary["combinations"] for run in c["runs"] if run["result"] != "pass"]
+    failed = [run for c in summary["combinations"] for run in c["runs"] if run["result"] not in ("pass", "skip")]
     failed_installs = [c for c in summary["combinations"] if c["status"] == "install failed"]
     if issues:
         print("\nNot run or failed:")
@@ -389,7 +412,9 @@ def main():
         for run_result in failed:
             print_log_end(run_result["log"])
     total = sum(len(c["runs"]) for c in summary["combinations"])
-    print(f"\n{total - len(failed)} of {total} runs passed. Report: {output / 'report.md'}")
+    skipped = sum(run["result"] == "skip" for c in summary["combinations"] for run in c["runs"])
+    skipped_text = f", {skipped} skipped" if skipped else ""
+    print(f"\n{total - skipped - len(failed)} of {total - skipped} runs passed{skipped_text}. Report: {output / 'report.md'}")
     if summary.get("interrupted"):
         return 130
     return 1 if failed or failed_installs else 0

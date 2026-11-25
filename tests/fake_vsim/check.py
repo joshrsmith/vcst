@@ -3,10 +3,14 @@ Runs the tests of project/ with Riviera-PRO and ModelSim/Questa replaced by fake
 VCST, through VUnit's interfaces to these simulators, gives a cocotb simulation what it needs, both when the
 simulator process is reused for several tests (VUnit's default) and when every test has a process of its own.
 
-Usage: python check.py
+Usage: python check.py [-p N] [--output-path DIR]
+
+N is the number of threads of the runs with several threads (default 3). The output of the runs is written to DIR, by
+default a new temporary directory which is removed if all checks pass.
 
 Needs tclsh. Exits with 1 if a check fails.
 """
+import argparse
 import json
 import os
 import shutil
@@ -79,9 +83,18 @@ def run(work, flavor, bin_dir, name, *args):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Checks VCST with fake Riviera-PRO and ModelSim/Questa simulators")
+    parser.add_argument("-p", "--num-threads", type=int, default=3, help="threads of the runs with several threads")
+    parser.add_argument("--output-path", type=Path, help="directory of the output of the runs")
+    options = parser.parse_args()
     if shutil.which("tclsh") is None:
         sys.exit("tclsh is needed to run the fake simulators")
-    work = Path(tempfile.mkdtemp(prefix="vcst_fake_vsim_"))
+    if options.output_path:
+        work = options.output_path
+        work.mkdir(parents=True, exist_ok=True)
+    else:
+        work = Path(tempfile.mkdtemp(prefix="vcst_fake_vsim_"))
+    threads = str(options.num_threads)
 
     for flavor in ("rivierapro", "modelsim"):
         bin_dir = create_fake_simulator(work, flavor)
@@ -92,8 +105,8 @@ def main():
         all_tests = {line for line in listed.stdout.splitlines() if line.startswith("lib.")}
         check(f"{flavor}: tests are listed", len(all_tests) > 2, listed.stdout + listed.stderr)
 
-        for name, args in (("persistent_one_thread", ["-p", "1"]), ("persistent", ["-p", "3"]),
-                           ("unique_sim", ["-p", "3", "--unique-sim"]), ("gui", ["-g"])):
+        for name, args in (("persistent_one_thread", ["-p", "1"]), ("persistent", ["-p", threads]),
+                           ("unique_sim", ["-p", threads, "--unique-sim"]), ("gui", ["-g"])):
             rc, output, tests, entries, test_output = run(work, flavor, bin_dir, name, *args)
             problems = [problem for entry in entries for problem in entry["problems"]]
             check(f"{flavor} ({name}): every test passes with what it needs", rc == 0 and set(tests) == all_tests
@@ -124,7 +137,8 @@ def main():
         print(f"{len(failures)} check(s) failed: {', '.join(failures)}")
         sys.exit(1)
     print("All checks passed.")
-    shutil.rmtree(work)
+    if not options.output_path:
+        shutil.rmtree(work)
 
 
 
