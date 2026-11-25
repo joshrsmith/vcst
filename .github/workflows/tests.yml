@@ -52,7 +52,7 @@ jobs:
         run: |
           curl -fsSL -o nvc.deb "https://github.com/nickg/nvc/releases/download/r${NVC_VERSION}/nvc_${NVC_VERSION}-1_amd64_ubuntu-24.04.deb"
           sudo apt-get update
-          sudo apt-get install -y ./nvc.deb
+          sudo apt-get install -y ./nvc.deb tcl
 
       # Installs the versions in a virtual environment, whose Python is run without activating it, which VCST supports
       - name: Run tests

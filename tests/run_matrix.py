@@ -38,9 +38,6 @@ QUICK = [("4.7.1", "1.8.1"), ("5.0.0.dev16", "1.9.2"), ("4.7.1", "2.0.1"), ("5.0
 #Simulators running all tests of a thread in one simulator process, unless --unique-sim is given
 REUSING_SIMULATORS = ["rivierapro", "modelsim"]
 
-#The simulator with which the suites not using the simulator are run by default, as CI has it
-INDEPENDENT_SUITES_SIMULATOR = "ghdl"
-
 @dataclass
 class Suite:
     """A test suite, a script exiting with 0 if all of its tests had their expected outcomes"""
@@ -53,10 +50,6 @@ class Suite:
     one_thread: bool = True
     #The simulators the suite is run with, None for all
     simulators: list = None
-    #Whether the suite doesn't use the simulator selected, so that running it once is enough. It is run by default only
-    #with INDEPENDENT_SUITES_SIMULATOR, so that the runs with a simulator needing a license take only what needs it, and
-    #with any simulator if selected with --suite
-    independent: bool = False
     #Executables the suite needs, the suite is skipped if one isn't found
     requires: list = field(default_factory=list)
 
@@ -72,7 +65,7 @@ SUITES = [
     #VCST loads cocotb on ModelSim/Questa through FLI, which supports VHDL only
     Suite("verilog", "verilog/run.py", simulators=["rivierapro"]),
     #Riviera-PRO and ModelSim/Questa replaced by fake simulators, which need tclsh
-    Suite("fake_vsim", "fake_vsim/check.py", one_thread=False, independent=True, requires=["tclsh"]),
+    Suite("fake_vsim", "fake_vsim/check.py", one_thread=False, requires=["tclsh"]),
 ]
 
 #Commands printing the version of a simulator, the executable being looked for in VUNIT_<SIMULATOR>_PATH or PATH
@@ -133,8 +126,6 @@ def planned_runs(simulator, threads, suite_names):
         if suite_names and suite.name not in suite_names:
             continue
         if suite.simulators is not None and simulator not in suite.simulators:
-            continue
-        if suite.independent and not suite_names and simulator != INDEPENDENT_SUITES_SIMULATOR:
             continue
         for n in ([1] if suite.one_thread and threads != 1 else []) + [threads]:
             runs.append((f"{suite.name}-p{n}", suite, n))
