@@ -64,6 +64,8 @@ SUITES = [
     Suite("front_end", "vhdl/front_end/check.py", one_thread=False),
     #VCST loads cocotb on ModelSim/Questa through FLI, which supports VHDL only
     Suite("verilog", "verilog/run.py", simulators=["rivierapro"]),
+    #The logic of VCST, without a simulator. The tests which use tclsh are skipped without it.
+    Suite("unit", "unit/run.py", one_thread=False),
     #Riviera-PRO and ModelSim/Questa replaced by fake simulators, which need tclsh
     Suite("fake_vsim", "fake_vsim/check.py", one_thread=False, requires=["tclsh"]),
 ]
