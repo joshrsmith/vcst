@@ -41,7 +41,7 @@ export VUNIT_RIVIERAPRO_PATH=/path/to/riviera-pro/bin
 python3 tests/run_matrix.py --output /path/to/results -p 4
 ```
 
-Everything it creates is in the output directory (`matrix_out` by default): the virtual environments, which later runs with the same output directory reuse, the output and console log of each run, and `report.md`, a summary of the results with the simulator, OS and Python versions. The suites are run with one thread and with `-p` threads, so with a simulator licensed per process, `-p` shouldn't exceed the licenses available. `--quick` runs 4 combinations still covering each version, `--vunit` and `--cocotb` select other versions, also ones not supported yet, and `--suite` selects suites, see `--help`. Every combination is installed with the Python running the script, CI uses Python 3.12. CI runs the same script, one combination per job, with GHDL and NVC.
+Everything it creates is in the output directory (`matrix_out` by default) including virtual environments created during the run, console outputs and logs, and a report, `report.md`, which summarizes the results. See `--help` for all options. CI runs the same script, one combination per job, with GHDL and NVC.
 
 ## Disadvantages
 There are a few disadvantages compared to use either VUnit or Cocotb by themselves. These include:
