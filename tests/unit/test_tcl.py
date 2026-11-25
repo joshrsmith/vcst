@@ -13,9 +13,10 @@ from vcst.monkey_patching.vsim import set_env_var, tcl_quote
 
 TCLSH = shutil.which("tclsh")
 
-# Characters special to tcl, in the context of a double quoted word and otherwise
+# Characters special to tcl, in the context of a double quoted word and otherwise. Characters outside the Basic
+# Multilingual Plane aren't used: tcl 8.6.8 reads them from a script as several characters, whatever the script is.
 SPECIAL = ["", " ", "a b", '"', "\\", "\\\\", "\\n", "$HOME", "${a}", "$(x)", "[exit 1]", "[puts hi]", "{", "}", "{a b}",
-           ";", "a;b", "\n", "\r\n", "line1\nline2", "tab\there", "unicode: é€\U0001f600", "#", "\\$",
+           ";", "a;b", "\n", "\r\n", "line1\nline2", "tab\there", "unicode: é€", "#", "\\$",
            '"\\"', "\\x41", "\\u0041", "100%", "a\\", "\\\\\\", "^test\\.name$", "(a|b)\\1"]
 
 
