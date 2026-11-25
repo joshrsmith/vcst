@@ -15,10 +15,10 @@ async def adder_basic_test(dut):
     A = 5
     B = 10
 
-    dut.A <= A
-    dut.B <= B
+    dut.A.value = A
+    dut.B.value = B
 
-    await Timer(2, units='ns')
+    await Timer(2, unit='ns')
 
     assert dut.X.value == adder_model(A, B), f"Adder result is incorrect: {dut.X.value} != 15"
 
@@ -26,16 +26,16 @@ async def adder_basic_test(dut):
 @cocotb.test()
 async def adder_randomised_test(dut):
     """Test for adding 2 random numbers multiple times"""
-    width = dut.DATA_WIDTH.value
+    width = int(dut.DATA_WIDTH.value)
     max_val = 2**width-1
     for i in range(10):
         A = random.randint(0, max_val)
         B = random.randint(0, max_val)
 
-        dut.A <= A
-        dut.B <= B
+        dut.A.value = A
+        dut.B.value = B
 
-        await Timer(2, units='ns')
+        await Timer(2, unit='ns')
         assert dut.X.value == adder_model(A, B), f"Randomised test failed with: {dut.A.value} + {dut.B.value} = {dut.X.value}"
 
 
