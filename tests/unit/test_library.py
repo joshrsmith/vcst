@@ -66,6 +66,16 @@ class OneCocotbModulePerTopLevel(unittest.TestCase):
                 self.assertIn("/first/test_dut", message)
                 self.assertIn("/second/test_dut", message)
 
+    def test_the_same_cocotb_module_added_again_is_the_same_test_bench(self):
+        for is_entity in (True, False):
+            with self.subTest(is_entity=is_entity):
+                library = self.library()
+                design_unit = FakeDesignUnit("dut", is_entity)
+                first = library.add_cocotb_testbench(design_unit, cocotb_module(), "/a/test_dut")
+                again = library.add_cocotb_testbench(design_unit, cocotb_module(), "/a/test_dut")
+                self.assertIs(again, first)
+                self.assertEqual(list(library._test_bench_list.test_benches), ["dut"])
+
     def test_the_first_cocotb_module_is_kept_when_a_second_is_refused(self):
         library = self.library()
         design_unit = FakeDesignUnit("dut", True)

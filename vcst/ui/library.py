@@ -19,6 +19,9 @@ class VCSTLibrary(Library):
         except KeyError:
             existing = None
         if isinstance(existing, CocoTestBench):
+            if existing.cocotb_module_location == cocotb_module_location:
+                # The same module again, which is harmless
+                return self.test_bench(design_unit.name)
             raise RuntimeError(
                 f"The top level {design_unit.name} of library {self._library_name} has the cocotb "
                 f"module {existing.cocotb_module_location} already, so {cocotb_module_location} "
