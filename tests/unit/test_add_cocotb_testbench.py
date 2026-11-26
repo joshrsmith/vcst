@@ -2,6 +2,7 @@
 What a user gets from add_cocotb_testbench when the cocotb module is set up wrongly: an error which names what is wrong.
 """
 
+import os
 import types
 import unittest
 from unittest import mock
@@ -95,6 +96,13 @@ class AddCocotbTestbench(unittest.TestCase):
             cocotb_module(top_level="counter", top_level_type="module", top_level_library="work")
         )
         self.assertEqual(ui.libraries["work"].calls[0], ("module", "counter", False))
+
+    def test_a_relative_location_is_made_absolute(self):
+        # The simulator runs in another directory than the run script, where a relative path finds nothing
+        ui = FakeUI()
+        VCST.add_cocotb_testbench(ui, "relative/dir/my_cocotb_module", cocotb_module())
+        (_, _, location) = ui.libraries["lib"].calls[-1]
+        self.assertEqual(location, os.path.abspath("relative/dir/my_cocotb_module"))
 
     def test_nvc_is_refused_with_a_cocotb_which_doesnt_support_it(self):
         with (

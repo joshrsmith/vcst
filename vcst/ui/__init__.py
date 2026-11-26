@@ -1,4 +1,5 @@
 import inspect
+import os
 from typing import Optional
 
 import cocotb
@@ -88,6 +89,8 @@ class VCST(VUnit):
 
     def add_cocotb_testbench(self, cocotb_module_location, cocotb_module=None):
         """Adds a cocotb module to a library based on variables defined in the cocotb module."""
+        # The simulator runs in another directory than this script, where a relative path finds nothing
+        cocotb_module_location = os.path.abspath(cocotb_module_location)
         top_level = None
         top_level_type = None
         top_level_library = None

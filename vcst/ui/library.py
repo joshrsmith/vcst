@@ -12,6 +12,21 @@ class VCSTLibrary(Library):
         """
         Adds a test bench running the tests of cocotb_module with design_unit as top level.
         """
+        # VUnit adds a test bench of its own for each top level, which this one replaces. A test bench
+        # of an earlier cocotb module would be replaced too, or fail to be set up.
+        try:
+            existing = self._test_bench_list.get_test_bench(self._library_name, design_unit.name)
+        except KeyError:
+            existing = None
+        if isinstance(existing, CocoTestBench):
+            if existing.cocotb_module_location == cocotb_module_location:
+                # The same module again, which is harmless
+                return self.test_bench(design_unit.name)
+            raise RuntimeError(
+                f"The top level {design_unit.name} of library {self._library_name} has the cocotb "
+                f"module {existing.cocotb_module_location} already, so {cocotb_module_location} "
+                "can't be added. VCST supports one cocotb module for each top level."
+            )
         # The database holds the test history, from which --seed repeat takes the seeds of the previous run
         test_bench = CocoTestBench(
             design_unit,

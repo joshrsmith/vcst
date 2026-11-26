@@ -221,6 +221,24 @@ if COCOTB2:
         output,
     )
 
+# Modules with the same file name in different directories are different modules
+rc, output, tests = run("same_names", "run_same_names.py")
+check(
+    "cocotb modules with the same file name in different directories both run",
+    rc == 0
+    and {name: result[0] for name, result in tests.items()}
+    == {"lib.dut_a.test_one": "passed", "lib.dut_b.test_two": "passed"},
+    output,
+)
+
+# One cocotb module can be added for a top level
+rc, output, tests = run("two_modules", "run_two_modules.py")
+check(
+    "a second cocotb module for a top level is refused with a clear error",
+    rc != 0 and "has the cocotb module" in output and "test_other" in output and not tests,
+    output,
+)
+
 # Random seeds
 seed_variable = "COCOTB_RANDOM_SEED" if COCOTB2 else "RANDOM_SEED"
 _, output, tests = run(
