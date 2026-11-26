@@ -197,6 +197,24 @@ class CocoTestRun(TestRun):
 
         return results
 
+    def _check_results(self, results, sim_ok):
+        """
+        Returns whether the results are final, and the results. They are final if any test failed, and otherwise
+        still subject to post_check.
+
+        The results are those cocotb reported. Unlike VUnit, which fails a test that passed if the simulator exits
+        with a non-zero status, a test cocotb reported as passed stays passed: a test that expects the HDL to end
+        the simulation (expect_error=SimFailure) leaves the simulator with a non-zero status, and so does a
+        simulator that fails after cocotb wrote its results. If cocotb reported nothing, the tests have failed
+        already, as no results file means they did.
+        """
+        if not sim_ok and PASSED in results.values():
+            print(
+                "WARNING: the simulator exited with a non-zero status after cocotb reported the test as passed. "
+                "The test is reported as passed, as cocotb reported it."
+            )
+        return FAILED in results.values(), results
+
     def _simulate(self, output_path, seed=None):
         """Runs the simulation with the environment variables and simulator flags cocotb needs."""
         if seed is not None:
