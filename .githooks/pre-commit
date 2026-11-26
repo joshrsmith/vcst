@@ -1,0 +1,22 @@
+#!/bin/sh
+# Checks formatting and linting with ruff, as the Lint workflow does, so that a commit with problems is
+# refused before it can be pushed. Enable it once per clone with:
+#   git config core.hooksPath .githooks
+# Install ruff in the version of .github/workflows/lint.yml (for example with pip install ruff==<version>).
+# To fix the problems, run `ruff format .` and `ruff check --fix .`; skip the hook with git commit --no-verify.
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+if ! command -v ruff >/dev/null 2>&1; then
+    echo "pre-commit: ruff is not installed, see .githooks/pre-commit" >&2
+    exit 1
+fi
+
+wanted=$(sed -n 's/.*RUFF_VERSION: "\(.*\)".*/\1/p' .github/workflows/lint.yml)
+if [ -n "$wanted" ] && [ "$(ruff --version)" != "ruff $wanted" ]; then
+    echo "pre-commit: warning: $(ruff --version) is installed, CI uses ruff $wanted" >&2
+fi
+
+status=0
+ruff format --check --quiet . || { echo "pre-commit: not formatted, run: ruff format ." >&2; status=1; }
+ruff check --quiet . || { echo "pre-commit: lint errors, see above; ruff check --fix . fixes some" >&2; status=1; }
+exit $status
