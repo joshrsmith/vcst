@@ -93,14 +93,14 @@ adder_tb.add_config(name="data_width_16", generics={"DATA_WIDTH": 16})
 ```
 Notice how the adder_tb can have configurations with different generics added to it, much like a normal testbench.
 
+Now you're all set. Run your run.py script like you would any vuint run script.
+
 ### Running only the tests that changed
 With VUnit 5, `--changed` runs only the tests that depend on changes since they last ran. VUnit only sees HDL files, so VCST adds the Python files of a cocotb test to what it depends on: the file of its cocotb module, and the Python files of your project that your run script has loaded, which are the files your cocotb modules import. That includes packages installed in editable mode (`pip install -e`), as their files are in your source tree. A modified file reruns the tests of all cocotb modules, except that a cocotb module only reruns its own tests. Files in the standard library and in site-packages don't count, so after updating an installed package, run the tests without `--changed`.
 
 VCST can't see a Python file that is only imported while a test runs, or by a package that isn't loaded when the run script runs. To have it considered, import it in the run script. Data files that tests read aren't known either. As in VUnit, a test that failed isn't run again by `--changed` unless something it depends on changed.
 
 This relies on private parts of VUnit 5, which is still changing. If they aren't as VCST expects, it prints a warning and `--changed` selects all tests. If VUnit no longer has the method VCST extends, the warning says that `--changed` only considers HDL files, as VUnit does by itself.
-
-Now you're all set. Run your run.py script like you would any vuint run script.
 
 ## Under the Hood
 
