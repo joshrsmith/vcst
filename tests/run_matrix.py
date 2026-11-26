@@ -50,6 +50,8 @@ class Suite:
     one_thread: bool = True
     #The simulators the suite is run with, None for all
     simulators: list = None
+    #Executables the suite needs, the suite is skipped if one isn't found
+    requires: list = field(default_factory=list)
 
 SUITES = [
     Suite("cocotb_examples", "vhdl/cocotb_examples/run.py"),
@@ -62,6 +64,8 @@ SUITES = [
     Suite("front_end", "vhdl/front_end/check.py", one_thread=False),
     #VCST loads cocotb on ModelSim/Questa through FLI, which supports VHDL only
     Suite("verilog", "verilog/run.py", simulators=["rivierapro"]),
+    #Riviera-PRO and ModelSim/Questa replaced by fake simulators, which need tclsh
+    Suite("fake_vsim", "fake_vsim/check.py", one_thread=False, requires=["tclsh"]),
 ]
 
 #Commands printing the version of a simulator, the executable being looked for in VUNIT_<SIMULATOR>_PATH or PATH
@@ -155,6 +159,17 @@ def vcst_revision():
 def duration(seconds):
     minutes, seconds = divmod(round(seconds), 60)
     return f"{minutes}:{seconds:02}"
+
+def python_incompatibility(log_path):
+    """
+    Returns why a version couldn't be installed if pip says it requires another Python than the one running this
+    script, else None. Such a combination isn't supported by this Python, which isn't a failure of VCST.
+    """
+    marker = "Ignored the following versions that require a different python version:"
+    for line in Path(log_path).read_text(errors="replace").splitlines():
+        if marker in line:
+            return f"needs another Python than {platform.python_version()} ({line.split(marker, 1)[1].strip()})"
+    return None
 
 def copy_vcst(destination):
     """
@@ -254,7 +269,9 @@ def problems(summary):
         elif combination["status"] == "install failed":
             lines.append(f"{title}: installation failed, see {combination['install_log']}")
         for run in combination["runs"]:
-            if run["result"] != "pass":
+            if run["result"] == "skip":
+                lines.append(f"{title}, {run['name']}: skipped, {run['reason']}")
+            elif run["result"] != "pass":
                 lines.append(f"{title}, {run['name']}: {run['result']}, see {run['log']}")
     return lines
 
@@ -349,8 +366,13 @@ def main():
             start = time.monotonic()
             python = install(output / "venvs" / name, vunit, cocotb, vcst_source, install_log)
             if python is None:
-                combination.update(status="install failed", install_log=str(install_log))
-                print(f"  installation failed, see {install_log}")
+                reason = python_incompatibility(install_log)
+                if reason:
+                    combination.update(status="unsupported", reason=reason)
+                    print(f"  not run: {reason}")
+                else:
+                    combination.update(status="install failed", install_log=str(install_log))
+                    print(f"  installation failed, see {install_log}")
                 continue
             print(f"  installed in {duration(time.monotonic() - start)}")
 
@@ -358,6 +380,14 @@ def main():
                 run_dir = results_dir / run_name
                 run_dir.mkdir()
                 log = run_dir / "console.log"
+                missing = [tool for tool in suite.requires if shutil.which(tool, path=env.get("PATH")) is None]
+                if missing:
+                    reason = f"{', '.join(missing)} not found"
+                    log.write_text(f"Skipped: {reason}\n")
+                    combination["runs"].append({"name": run_name, "result": "skip", "seconds": 0, "log": str(log),
+                                                "reason": reason})
+                    print(f"  {run_name:<26} skip     {reason}")
+                    continue
                 command = [str(python), str(ROOT / "tests" / suite.script), *suite.args, "-p", str(threads),
                            "--output-path", str(run_dir)]
                 start = time.monotonic()
@@ -377,7 +407,7 @@ def main():
     print("Columns: VUnit/cocotb")
     print(table(results_grid(summary, runs)))
     issues = problems(summary)
-    failed = [run for c in summary["combinations"] for run in c["runs"] if run["result"] != "pass"]
+    failed = [run for c in summary["combinations"] for run in c["runs"] if run["result"] not in ("pass", "skip")]
     failed_installs = [c for c in summary["combinations"] if c["status"] == "install failed"]
     if issues:
         print("\nNot run or failed:")
@@ -389,10 +419,26 @@ def main():
         for run_result in failed:
             print_log_end(run_result["log"])
     total = sum(len(c["runs"]) for c in summary["combinations"])
-    print(f"\n{total - len(failed)} of {total} runs passed. Report: {output / 'report.md'}")
+    skipped = sum(run["result"] == "skip" for c in summary["combinations"] for run in c["runs"])
+    executed = total - skipped
+    not_run = sum(c["status"] == "unsupported" for c in summary["combinations"])
+    plural = lambda count, noun: f"{count} {noun}{'s' if count != 1 else ''}"
+    if failed or failed_installs:
+        problems_found = ([f"{len(failed)} of {plural(executed, 'run')} failed"] if failed else []) + (
+            [f"{plural(len(failed_installs), 'installation')} failed"] if failed_installs else [])
+        verdict = "FAIL, " + " and ".join(problems_found)
+    elif executed == 0:
+        verdict = "NOTHING WAS RUN"
+    else:
+        verdict = f"PASS, all {plural(executed, 'run')} passed" if executed > 1 else "PASS, the run passed"
+    notes = [f"{skipped} skipped"] if skipped else []
+    if not_run:
+        notes.append(f"{not_run} of {len(pairs)} combinations not run")
+    print(f"\n{simulator} ({version}): {verdict}{' (' + ', '.join(notes) + ')' if notes else ''}. "
+          f"Report: {output / 'report.md'}")
     if summary.get("interrupted"):
         return 130
-    return 1 if failed or failed_installs else 0
+    return 1 if failed or failed_installs or executed == 0 else 0
 
 if __name__ == "__main__":
     sys.exit(main())
