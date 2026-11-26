@@ -2,6 +2,7 @@
 VUnit runs the tests in several threads, so the environment of a cocotb test can't be put in os.environ. Every process a
 thread starts while it simulates a test must have the environment of that test, and no other.
 """
+
 import os
 import sys
 import threading
@@ -52,9 +53,8 @@ class ExtraEnv(unittest.TestCase):
             self.assertEqual(output_of_process(), "unset")
 
     def test_the_environment_ends_when_the_test_raises(self):
-        with self.assertRaises(ValueError):
-            with extra_env({"VCST_UNIT_X": "inside"}):
-                raise ValueError
+        with self.assertRaises(ValueError), extra_env({"VCST_UNIT_X": "inside"}):
+            raise ValueError
         self.assertIsNone(get_extra_env())
 
     def test_none_removes_a_variable_of_the_process(self):

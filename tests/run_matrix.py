@@ -11,7 +11,9 @@ this checkout. The virtual environments are kept for later runs with the same DI
 Each run of a suite writes its VUnit output and its console output (console.log) to DIR/<combination>/<suite>-p<N>.
 The results of all runs are summarized in DIR/report.md and DIR/summary.json. Exits with 1 if a run failed.
 """
+
 import argparse
+import contextlib
 import itertools
 import json
 import os
@@ -28,30 +30,33 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-#The versions of VUnit and cocotb VCST supports. Each VUnit version is tested with each cocotb version.
+# The versions of VUnit and cocotb VCST supports. Each VUnit version is tested with each cocotb version.
 VUNIT_VERSIONS = ["4.7.1", "5.0.0.dev16"]
 COCOTB_VERSIONS = ["1.8.1", "1.9.2", "2.0.1", "2.1.0"]
-#Fewer combinations, run with --quick, still covering each version. cocotb versions differ in how cocotb is loaded
-#into the simulator.
+# Fewer combinations, run with --quick, still covering each version. cocotb versions differ in how cocotb is loaded
+# into the simulator.
 QUICK = [("4.7.1", "1.8.1"), ("5.0.0.dev16", "1.9.2"), ("4.7.1", "2.0.1"), ("5.0.0.dev16", "2.1.0")]
 
-#Simulators running all tests of a thread in one simulator process, unless --unique-sim is given
+# Simulators running all tests of a thread in one simulator process, unless --unique-sim is given
 REUSING_SIMULATORS = ["rivierapro", "modelsim"]
+
 
 @dataclass
 class Suite:
     """A test suite, a script exiting with 0 if all of its tests had their expected outcomes"""
+
     name: str
-    #Path relative to the tests directory
+    # Path relative to the tests directory
     script: str
-    #Further arguments of the script
+    # Further arguments of the script
     args: list = field(default_factory=list)
-    #Whether the suite is also run with one thread, besides -p N
+    # Whether the suite is also run with one thread, besides -p N
     one_thread: bool = True
-    #The simulators the suite is run with, None for all
+    # The simulators the suite is run with, None for all
     simulators: list = None
-    #Executables the suite needs, the suite is skipped if one isn't found
+    # Executables the suite needs, the suite is skipped if one isn't found
     requires: list = field(default_factory=list)
+
 
 SUITES = [
     Suite("cocotb_examples", "vhdl/cocotb_examples/run.py"),
@@ -59,18 +64,23 @@ SUITES = [
     Suite("parameterize_test", "vhdl/parameterize_test/run.py"),
     Suite("test_outcomes", "vhdl/test_outcomes/run.py"),
     Suite("isolation", "vhdl/isolation/run.py"),
-    Suite("isolation_unique_sim", "vhdl/isolation/run.py", ["--unique-sim"], one_thread=False,
-          simulators=REUSING_SIMULATORS),
+    Suite(
+        "isolation_unique_sim",
+        "vhdl/isolation/run.py",
+        ["--unique-sim"],
+        one_thread=False,
+        simulators=REUSING_SIMULATORS,
+    ),
     Suite("front_end", "vhdl/front_end/check.py", one_thread=False),
-    #VCST loads cocotb on ModelSim/Questa through FLI, which supports VHDL only
+    # VCST loads cocotb on ModelSim/Questa through FLI, which supports VHDL only
     Suite("verilog", "verilog/run.py", simulators=["rivierapro"]),
-    #The logic of VCST, without a simulator. The tests which use tclsh are skipped without it.
+    # The logic of VCST, without a simulator. The tests which use tclsh are skipped without it.
     Suite("unit", "unit/run.py", one_thread=False),
-    #Riviera-PRO and ModelSim/Questa replaced by fake simulators, which need tclsh
+    # Riviera-PRO and ModelSim/Questa replaced by fake simulators, which need tclsh
     Suite("fake_vsim", "fake_vsim/check.py", one_thread=False, requires=["tclsh"]),
 ]
 
-#Commands printing the version of a simulator, the executable being looked for in VUNIT_<SIMULATOR>_PATH or PATH
+# Commands printing the version of a simulator, the executable being looked for in VUNIT_<SIMULATOR>_PATH or PATH
 VERSION_COMMANDS = {
     "ghdl": ["ghdl", "--version"],
     "nvc": ["nvc", "--version"],
@@ -78,48 +88,97 @@ VERSION_COMMANDS = {
     "modelsim": ["vsim", "-version"],
 }
 
+
 def unsupported(simulator, cocotb):
     """Returns why the cocotb version can't be used with the simulator, None if it can"""
     if simulator == "nvc" and version_tuple(cocotb) < (1, 9):
         return "NVC needs cocotb 1.9 or later"
     return None
 
+
 def version_tuple(version):
     return tuple(int(part) for part in re.findall(r"\d+", version)[:2])
+
 
 def short_version(version):
     """Returns the major and minor version, e.g. 5.0 for 5.0.0.dev16"""
     return ".".join(str(part) for part in version_tuple(version))
 
+
 def combination_name(vunit, cocotb):
     return f"vunit{vunit}-cocotb{cocotb}"
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0].strip())
-    parser.add_argument("--output", type=Path, default=Path("matrix_out"), metavar="DIR",
-                        help="directory of the virtual environments and results (default: matrix_out)")
-    parser.add_argument("-p", "--num-threads", type=int, default=4, metavar="N",
-                        help="threads, i.e. simulator processes, of the parallel runs (default: 4)")
-    parser.add_argument("--quick", action="store_true", help=f"only run {len(QUICK)} combinations covering each version")
-    parser.add_argument("--vunit", nargs="+", metavar="VERSION",
-                        help="VUnit versions to run, instead of the supported ones (any version on PyPI)")
-    parser.add_argument("--cocotb", nargs="+", metavar="VERSION",
-                        help="cocotb versions to run, instead of the supported ones (any version on PyPI)")
-    parser.add_argument("--suite", nargs="+", choices=[suite.name for suite in SUITES], metavar="NAME",
-                        help=f"only run these suites: {', '.join(suite.name for suite in SUITES)}")
-    parser.add_argument("--timeout", type=float, default=1800, metavar="SECONDS", help="seconds a run may take (default: 1800)")
-    parser.add_argument("--show-logs", action="store_true", help="print the end of the console log of failed runs")
-    parser.add_argument("--github-matrix", nargs="+", metavar="SIMULATOR",
-                        help="print the combinations to run with these simulators as a GitHub Actions matrix, and exit")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("matrix_out"),
+        metavar="DIR",
+        help="directory of the virtual environments and results (default: matrix_out)",
+    )
+    parser.add_argument(
+        "-p",
+        "--num-threads",
+        type=int,
+        default=4,
+        metavar="N",
+        help="threads, i.e. simulator processes, of the parallel runs (default: 4)",
+    )
+    parser.add_argument(
+        "--quick",
+        action="store_true",
+        help=f"only run {len(QUICK)} combinations covering each version",
+    )
+    parser.add_argument(
+        "--vunit",
+        nargs="+",
+        metavar="VERSION",
+        help="VUnit versions to run, instead of the supported ones (any version on PyPI)",
+    )
+    parser.add_argument(
+        "--cocotb",
+        nargs="+",
+        metavar="VERSION",
+        help="cocotb versions to run, instead of the supported ones (any version on PyPI)",
+    )
+    parser.add_argument(
+        "--suite",
+        nargs="+",
+        choices=[suite.name for suite in SUITES],
+        metavar="NAME",
+        help=f"only run these suites: {', '.join(suite.name for suite in SUITES)}",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=1800,
+        metavar="SECONDS",
+        help="seconds a run may take (default: 1800)",
+    )
+    parser.add_argument(
+        "--show-logs", action="store_true", help="print the end of the console log of failed runs"
+    )
+    parser.add_argument(
+        "--github-matrix",
+        nargs="+",
+        metavar="SIMULATOR",
+        help="print the combinations to run with these simulators as a GitHub Actions matrix, and exit",
+    )
     options = parser.parse_args()
     if options.quick and (options.vunit or options.cocotb):
         parser.error("--quick can't be combined with --vunit or --cocotb")
     return options
 
+
 def combinations(options):
     if options.quick:
         return list(QUICK)
-    return list(itertools.product(options.vunit or VUNIT_VERSIONS, options.cocotb or COCOTB_VERSIONS))
+    return list(
+        itertools.product(options.vunit or VUNIT_VERSIONS, options.cocotb or COCOTB_VERSIONS)
+    )
+
 
 def planned_runs(simulator, threads, suite_names):
     """Returns the (name, suite, threads) of the runs of each combination"""
@@ -133,34 +192,51 @@ def planned_runs(simulator, threads, suite_names):
             runs.append((f"{suite.name}-p{n}", suite, n))
     return runs
 
+
 def simulator_version(simulator):
     """Returns the first line the simulator prints as its version, and its executable, or "unknown" """
     command = VERSION_COMMANDS.get(simulator)
     if command is None:
         return "unknown", None
-    executable = shutil.which(command[0], path=os.environ.get(f"VUNIT_{simulator.upper()}_PATH") or None)
+    executable = shutil.which(
+        command[0], path=os.environ.get(f"VUNIT_{simulator.upper()}_PATH") or None
+    )
     if executable is None:
         return "unknown", None
     try:
-        proc = subprocess.run([executable, *command[1:]], capture_output=True, text=True, timeout=60,
-                              stdin=subprocess.DEVNULL)
+        proc = subprocess.run(
+            [executable, *command[1:]],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            stdin=subprocess.DEVNULL,
+            check=False,
+        )
     except (OSError, subprocess.TimeoutExpired):
         return "unknown", executable
     lines = [line.strip() for line in (proc.stdout + proc.stderr).splitlines() if line.strip()]
     return (lines[0] if lines else "unknown"), executable
 
+
 def vcst_revision():
     """Returns the git revision of the checkout, marked dirty if it has changes, or "unknown" """
     try:
-        proc = subprocess.run(["git", "-C", str(ROOT), "describe", "--always", "--dirty"], capture_output=True,
-                              text=True, timeout=60)
+        proc = subprocess.run(
+            ["git", "-C", str(ROOT), "describe", "--always", "--dirty"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
     except (OSError, subprocess.TimeoutExpired):
         return "unknown"
     return proc.stdout.strip() if proc.returncode == 0 else "unknown"
 
+
 def duration(seconds):
     minutes, seconds = divmod(round(seconds), 60)
     return f"{minutes}:{seconds:02}"
+
 
 def python_incompatibility(log_path):
     """
@@ -173,39 +249,55 @@ def python_incompatibility(log_path):
             return f"needs another Python than {platform.python_version()} ({line.split(marker, 1)[1].strip()})"
     return None
 
+
 def copy_vcst(destination):
     """
     Copies what is needed to install VCST, so that building it leaves the checkout unchanged, and the same VCST is
     installed for every combination, even if the checkout is changed in the meantime
     """
     shutil.rmtree(destination, ignore_errors=True)
-    shutil.copytree(ROOT / "vcst", destination / "vcst", ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copytree(
+        ROOT / "vcst", destination / "vcst", ignore=shutil.ignore_patterns("__pycache__")
+    )
     for name in ("pyproject.toml", "README.md", "LICENSE"):
         shutil.copy2(ROOT / name, destination)
+
 
 def install(venv_dir, vunit, cocotb, vcst_source, log_path):
     """Installs a combination in a virtual environment, created if needed, returns its Python or None if it failed"""
     python = venv_dir / ("Scripts" if os.name == "nt" else "bin") / "python"
     pip = [str(python), "-m", "pip", "install", "--disable-pip-version-check"]
     commands = [] if python.exists() else [[sys.executable, "-m", "venv", str(venv_dir)]]
-    commands += [pip + [f"vunit-hdl=={vunit}", f"cocotb=={cocotb}"],
-                 pip + ["--no-deps", "--force-reinstall", str(vcst_source)]]
+    commands += [
+        pip + [f"vunit-hdl=={vunit}", f"cocotb=={cocotb}"],
+        pip + ["--no-deps", "--force-reinstall", str(vcst_source)],
+    ]
     with open(log_path, "w") as log:
         for command in commands:
             log.write(f"$ {' '.join(command)}\n")
             log.flush()
-            if subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL).returncode:
+            if subprocess.run(
+                command, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, check=False
+            ).returncode:
                 return None
     return python
+
 
 def run(command, log_path, cwd, env, timeout):
     """Runs a command with its output written to log_path, returns "pass", "FAIL" or "TIMEOUT" """
     with open(log_path, "w") as log:
         log.write(f"$ {' '.join(command)}\n")
         log.flush()
-        #In a session of its own, so that the simulators started by the script can be stopped with it
-        proc = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, cwd=cwd,
-                                env=env, start_new_session=True)
+        # In a session of its own, so that the simulators started by the script can be stopped with it
+        proc = subprocess.Popen(
+            command,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            stdin=subprocess.DEVNULL,
+            cwd=cwd,
+            env=env,
+            start_new_session=True,
+        )
         try:
             return "pass" if proc.wait(timeout) == 0 else "FAIL"
         except subprocess.TimeoutExpired:
@@ -215,6 +307,7 @@ def run(command, log_path, cwd, env, timeout):
         except KeyboardInterrupt:
             stop(proc)
             raise
+
 
 def stop(proc):
     """
@@ -227,27 +320,36 @@ def stop(proc):
             proc.wait(30)
         except (ProcessLookupError, subprocess.TimeoutExpired):
             pass
-        try:
+        with contextlib.suppress(ProcessLookupError):
             os.killpg(proc.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
     else:
         proc.kill()
     proc.wait()
 
+
 def table(rows):
     """Formats rows, the first being the header, as columns aligned for the console"""
     widths = [max(len(row[i]) for row in rows) for i in range(len(rows[0]))]
-    return "\n".join("  ".join(cell.ljust(width) for cell, width in zip(row, widths)).rstrip() for row in rows)
+    return "\n".join(
+        "  ".join(cell.ljust(width) for cell, width in zip(row, widths)).rstrip() for row in rows
+    )
+
 
 def markdown_table(rows):
     lines = ["| " + " | ".join(row) + " |" for row in rows]
     lines.insert(1, "|" + "---|" * len(rows[0]))
     return "\n".join(lines)
 
+
 def results_grid(summary, runs):
     """Returns rows of the runs against the combinations, the first row being the header"""
-    rows = [["Run"] + [f"{short_version(c['vunit'])}/{short_version(c['cocotb'])}" for c in summary["combinations"]]]
+    rows = [
+        ["Run"]
+        + [
+            f"{short_version(c['vunit'])}/{short_version(c['cocotb'])}"
+            for c in summary["combinations"]
+        ]
+    ]
     for name, _, _ in runs:
         row = [name]
         for combination in summary["combinations"]:
@@ -260,6 +362,7 @@ def results_grid(summary, runs):
                 row.append(results.get(name, "-"))
         rows.append(row)
     return rows
+
 
 def problems(summary):
     """Returns lines describing the combinations which weren't run and the runs which failed"""
@@ -276,6 +379,7 @@ def problems(summary):
             elif run["result"] != "pass":
                 lines.append(f"{title}, {run['name']}: {run['result']}, see {run['log']}")
     return lines
+
 
 def write_report(output, summary, runs):
     (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
@@ -302,9 +406,11 @@ def write_report(output, summary, runs):
         lines += ["", "Not run or failed:", ""] + [f"- {line}" for line in issues]
     (output / "report.md").write_text("\n".join(lines) + "\n")
 
+
 def print_log_end(log, lines=40):
     print(f"\n----- {log} (last {lines} lines)")
     print("\n".join(Path(log).read_text(errors="replace").splitlines()[-lines:]))
+
 
 def github_matrix(options):
     include = []
@@ -313,6 +419,7 @@ def github_matrix(options):
             if unsupported(simulator, cocotb) is None:
                 include.append({"vunit": vunit, "cocotb": cocotb, "simulator": simulator})
     return {"include": include}
+
 
 def main():
     options = parse_args()
@@ -339,14 +446,16 @@ def main():
         "date": datetime.now().astimezone().isoformat(timespec="seconds"),
         "combinations": [],
     }
-    print(f"VCST test matrix on {simulator} ({version}), Python {summary['python']}, {len(pairs)} combination{'s' if len(pairs) != 1 else ''}, "
-          f"-p {options.num_threads}")
+    print(
+        f"VCST test matrix on {simulator} ({version}), Python {summary['python']}, {len(pairs)} combination{'s' if len(pairs) != 1 else ''}, "
+        f"-p {options.num_threads}"
+    )
     print(f"Output: {output}")
 
     vcst_source = output / "vcst-src"
     copy_vcst(vcst_source)
-    #The Python of each virtual environment is run without activating it, as by CI. VCST would pass the VIRTUAL_ENV
-    #of an activated environment on to cocotb 1.x, which would then use that environment.
+    # The Python of each virtual environment is run without activating it, as by CI. VCST would pass the VIRTUAL_ENV
+    # of an activated environment on to cocotb 1.x, which would then use that environment.
     env = {name: value for name, value in os.environ.items() if name != "VIRTUAL_ENV"}
 
     try:
@@ -382,23 +491,47 @@ def main():
                 run_dir = results_dir / run_name
                 run_dir.mkdir()
                 log = run_dir / "console.log"
-                missing = [tool for tool in suite.requires if shutil.which(tool, path=env.get("PATH")) is None]
+                missing = [
+                    tool
+                    for tool in suite.requires
+                    if shutil.which(tool, path=env.get("PATH")) is None
+                ]
                 if missing:
                     reason = f"{', '.join(missing)} not found"
                     log.write_text(f"Skipped: {reason}\n")
-                    combination["runs"].append({"name": run_name, "result": "skip", "seconds": 0, "log": str(log),
-                                                "reason": reason})
+                    combination["runs"].append(
+                        {
+                            "name": run_name,
+                            "result": "skip",
+                            "seconds": 0,
+                            "log": str(log),
+                            "reason": reason,
+                        }
+                    )
                     print(f"  {run_name:<26} skip     {reason}")
                     continue
-                command = [str(python), str(ROOT / "tests" / suite.script), *suite.args, "-p", str(threads),
-                           "--output-path", str(run_dir)]
+                command = [
+                    str(python),
+                    str(ROOT / "tests" / suite.script),
+                    *suite.args,
+                    "-p",
+                    str(threads),
+                    "--output-path",
+                    str(run_dir),
+                ]
                 start = time.monotonic()
-                #Run from the output directory, as a checkout in the working directory could be imported instead of
-                #the VCST installed
+                # Run from the output directory, as a checkout in the working directory could be imported instead of
+                # the VCST installed
                 result = run(command, log, run_dir, env, options.timeout)
                 seconds = time.monotonic() - start
-                combination["runs"].append({"name": run_name, "result": result, "seconds": round(seconds, 1),
-                                            "log": str(log)})
+                combination["runs"].append(
+                    {
+                        "name": run_name,
+                        "result": result,
+                        "seconds": round(seconds, 1),
+                        "log": str(log),
+                    }
+                )
                 print(f"  {run_name:<26} {result:<8} {duration(seconds)}")
     except KeyboardInterrupt:
         print("\nInterrupted, reporting the runs so far")
@@ -409,7 +542,12 @@ def main():
     print("Columns: VUnit/cocotb")
     print(table(results_grid(summary, runs)))
     issues = problems(summary)
-    failed = [run for c in summary["combinations"] for run in c["runs"] if run["result"] not in ("pass", "skip")]
+    failed = [
+        run
+        for c in summary["combinations"]
+        for run in c["runs"]
+        if run["result"] not in ("pass", "skip")
+    ]
     failed_installs = [c for c in summary["combinations"] if c["status"] == "install failed"]
     if issues:
         print("\nNot run or failed:")
@@ -424,23 +562,34 @@ def main():
     skipped = sum(run["result"] == "skip" for c in summary["combinations"] for run in c["runs"])
     executed = total - skipped
     not_run = sum(c["status"] == "unsupported" for c in summary["combinations"])
-    plural = lambda count, noun: f"{count} {noun}{'s' if count != 1 else ''}"
+
+    def plural(count, noun):
+        return f"{count} {noun}{'s' if count != 1 else ''}"
+
     if failed or failed_installs:
-        problems_found = ([f"{len(failed)} of {plural(executed, 'run')} failed"] if failed else []) + (
-            [f"{plural(len(failed_installs), 'installation')} failed"] if failed_installs else [])
+        problems_found = (
+            [f"{len(failed)} of {plural(executed, 'run')} failed"] if failed else []
+        ) + ([f"{plural(len(failed_installs), 'installation')} failed"] if failed_installs else [])
         verdict = "FAIL, " + " and ".join(problems_found)
     elif executed == 0:
         verdict = "NOTHING WAS RUN"
     else:
-        verdict = f"PASS, all {plural(executed, 'run')} passed" if executed > 1 else "PASS, the run passed"
+        verdict = (
+            f"PASS, all {plural(executed, 'run')} passed"
+            if executed > 1
+            else "PASS, the run passed"
+        )
     notes = [f"{skipped} skipped"] if skipped else []
     if not_run:
         notes.append(f"{not_run} of {len(pairs)} combinations not run")
-    print(f"\n{simulator} ({version}): {verdict}{' (' + ', '.join(notes) + ')' if notes else ''}. "
-          f"Report: {output / 'report.md'}")
+    print(
+        f"\n{simulator} ({version}): {verdict}{' (' + ', '.join(notes) + ')' if notes else ''}. "
+        f"Report: {output / 'report.md'}"
+    )
     if summary.get("interrupted"):
         return 130
     return 1 if failed or failed_installs or executed == 0 else 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

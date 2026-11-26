@@ -4,6 +4,7 @@ the tcl script VUnit gives it with tclsh, with the simulator commands stubbed (p
 
 Usage: fake_tool.py <executable name> [arguments], with FAKE_FLAVOR set to rivierapro or modelsim.
 """
+
 import os
 import sys
 import tempfile
@@ -23,7 +24,9 @@ elif tool == "vlib":
 elif tool == "vsim":
     # The script to run is either a file or a command
     do = args[args.index("-do") + 1]
-    prelude = (HERE / "prelude.tcl").read_text().replace("@FAKE_COCOTB@", str(HERE / "fake_cocotb.py"))
+    prelude = (
+        (HERE / "prelude.tcl").read_text().replace("@FAKE_COCOTB@", str(HERE / "fake_cocotb.py"))
+    )
     script = prelude + (f"source {{{do}}}\n" if os.path.isfile(do) else do + "\n")
     if "-c" not in args:
         # The graphical user interface, in which the user starts the simulation with vunit_run

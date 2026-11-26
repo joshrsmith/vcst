@@ -3,6 +3,7 @@ Stand-in for cocotb in a fake simulation: checks what a cocotb simulation needs 
 passed, or failed with the problems found. Run with the Python interpreter given to the simulation
 (PYGPI_PYTHON_BIN) and the arguments of the vsim command loading the design.
 """
+
 import importlib
 import json
 import os
@@ -16,20 +17,25 @@ env = os.environ
 problems = []
 flavor = env.get("FAKE_FLAVOR", "rivierapro")
 
+
 def check(condition, problem):
     if not condition:
         problems.append(problem)
 
+
 def existing_file(path, what):
     check(path and Path(path).is_file(), f"{what} {path!r} does not exist")
+
 
 # cocotb version of the environment
 cocotb2 = "COCOTB_TEST_MODULES" in env
 check(cocotb2 != ("MODULE" in env), "exactly one of COCOTB_TEST_MODULES and MODULE must be set")
 
+
 # The GPI library loaded by the simulator
 def flag_value(flag):
     return load_args[load_args.index(flag) + 1] if flag in load_args else None
+
 
 language = env.get("TOPLEVEL_LANG")
 if flavor == "rivierapro":
@@ -40,14 +46,21 @@ if flavor == "rivierapro":
         path, _, entry = library.partition(":")
         existing_file(path, "GPI library")
         import cocotb
+
         version = tuple(int(part) for part in re.findall(r"\d+", cocotb.__version__)[:2])
         if version >= (2, 1) and language == "vhdl":
-            check(entry == "vhpi_startup_routines_bootstrap", f"VHPI entry point {entry!r} given with cocotb 2.1")
+            check(
+                entry == "vhpi_startup_routines_bootstrap",
+                f"VHPI entry point {entry!r} given with cocotb 2.1",
+            )
     for access in ("+access", "+w"):
         check(access in load_args, f"{access} not given to vsim")
 else:
     foreign = flag_value("-foreign")
-    check(foreign is not None and foreign.startswith("cocotb_init "), f"-foreign cocotb_init not given: {load_args}")
+    check(
+        foreign is not None and foreign.startswith("cocotb_init "),
+        f"-foreign cocotb_init not given: {load_args}",
+    )
     if foreign:
         existing_file(foreign.split(" ", 1)[1], "FLI library")
 
@@ -55,7 +68,10 @@ else:
 existing_file(env.get("PYGPI_PYTHON_BIN"), "PYGPI_PYTHON_BIN")
 if "GPI_USERS" in env:
     users = env["GPI_USERS"].split(";")
-    check(len(users) == 2, f"GPI_USERS={env['GPI_USERS']!r} should give libpython and the pygpi entry point")
+    check(
+        len(users) == 2,
+        f"GPI_USERS={env['GPI_USERS']!r} should give libpython and the pygpi entry point",
+    )
     existing_file(users[0], "libpython in GPI_USERS")
     existing_file(users[-1].rsplit(",", 1)[0], "pygpi entry point in GPI_USERS")
 else:
@@ -63,13 +79,17 @@ else:
 
 # cocotb 1.x finds the Python interpreter of a virtual environment only through VIRTUAL_ENV
 if not cocotb2 and sys.prefix != sys.base_prefix:
-    check(env.get("VIRTUAL_ENV") == sys.prefix,
-          f"VIRTUAL_ENV={env.get('VIRTUAL_ENV')!r}, but the interpreter is in {sys.prefix}")
+    check(
+        env.get("VIRTUAL_ENV") == sys.prefix,
+        f"VIRTUAL_ENV={env.get('VIRTUAL_ENV')!r}, but the interpreter is in {sys.prefix}",
+    )
 
 # The top level
 top_level = env.get("COCOTB_TOPLEVEL" if cocotb2 else "TOPLEVEL", "")
-check(top_level and any(top_level.lower() in arg.lower() for arg in load_args),
-      f"top level {top_level!r} is not loaded: {load_args}")
+check(
+    top_level and any(top_level.lower() in arg.lower() for arg in load_args),
+    f"top level {top_level!r} is not loaded: {load_args}",
+)
 
 # cocotb 2.x refuses to run when both are set
 if cocotb2:
@@ -81,10 +101,17 @@ selected = []
 try:
     module = importlib.import_module(module_name)
     if cocotb2:
+        # isort: off
         import cocotb.triggers  # cocotb 2.0 can't import cocotb.regression first
         import cocotb.regression
-        generators = tuple(getattr(cocotb.regression, n) for n in ("TestGenerator", "Parameterized")
-                           if hasattr(cocotb.regression, n))
+
+        # isort: on
+
+        generators = tuple(
+            getattr(cocotb.regression, n)
+            for n in ("TestGenerator", "Parameterized")
+            if hasattr(cocotb.regression, n)
+        )
         tests = []
         for obj in vars(module).values():
             if isinstance(obj, cocotb.regression.Test):
@@ -95,6 +122,7 @@ try:
         selected = [test.name for test in tests if test_filter.search(test.fullname)]
     else:
         from cocotb.decorators import test as Test
+
         for name in env.get("TESTCASE", "").split(","):
             test = getattr(module, name, None)
             check(isinstance(test, Test), f"TESTCASE {name!r} is not a test of {module_name}")
@@ -108,9 +136,33 @@ check(len(selected) == 1, f"one test should be selected, {selected} were")
 log = env.get("FAKE_LOG")
 if log:
     with open(log, "a") as f:
-        f.write(json.dumps({"load": load_args, "env": {k: v for k, v in env.items() if "COCOTB" in k or k in (
-            "MODULE", "TESTCASE", "TOPLEVEL", "TOPLEVEL_LANG", "RANDOM_SEED", "GPI_USERS", "LIBPYTHON_LOC",
-            "PYGPI_PYTHON_BIN", "VIRTUAL_ENV")}, "selected": selected, "problems": problems}) + "\n")
+        f.write(
+            json.dumps(
+                {
+                    "load": load_args,
+                    "env": {
+                        k: v
+                        for k, v in env.items()
+                        if "COCOTB" in k
+                        or k
+                        in (
+                            "MODULE",
+                            "TESTCASE",
+                            "TOPLEVEL",
+                            "TOPLEVEL_LANG",
+                            "RANDOM_SEED",
+                            "GPI_USERS",
+                            "LIBPYTHON_LOC",
+                            "PYGPI_PYTHON_BIN",
+                            "VIRTUAL_ENV",
+                        )
+                    },
+                    "selected": selected,
+                    "problems": problems,
+                }
+            )
+            + "\n"
+        )
 root = ET.Element("testsuites")
 suite = ET.SubElement(root, "testsuite", name="all")
 for name in selected or ["no_test_selected"]:

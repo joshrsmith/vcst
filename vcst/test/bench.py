@@ -2,12 +2,12 @@ import inspect
 from collections import OrderedDict
 from dataclasses import dataclass
 
-from vunit.test.bench import TestBench, TestConfigurationVisitor, FileLocation
+from vunit.configuration import DEFAULT_NAME, Configuration
+from vunit.test.bench import FileLocation, TestBench, TestConfigurationVisitor
 from vunit.test.list import TestList
-from vunit.configuration import Configuration, DEFAULT_NAME
 
-from .suites import IndependentCocoSimTestCase
 from ..utils.compat import find_cocotb_tests
+from .suites import IndependentCocoSimTestCase
 
 # VUnit 5 gives each test a seed and passes it to create_tests before elaborate_only
 _VUNIT_HAS_SEEDS = "seed" in inspect.signature(TestBench.create_tests).parameters
@@ -16,8 +16,10 @@ try:
     # Looks up the seed of a test in the test history, which VUnit keeps since 5.0.0.dev8
     from vunit.test.bench import _get_historic_seed
 except ImportError:
+
     def _get_historic_seed(test_history, test_suite_name, test_name=None):
         return None
+
 
 def _split_create_tests_args(args):
     """
@@ -30,6 +32,7 @@ def _split_create_tests_args(args):
         seed = None
         elaborate_only, test_list = (list(args) + [None] * 2)[:2]
     return seed, elaborate_only, test_list
+
 
 class CocoTestBench(TestBench):
     def __init__(self, design_unit, cocotb_module, cocotb_module_location, database=None):
@@ -63,15 +66,23 @@ class CocoTestBench(TestBench):
         """
         self._cocotb_module = cocotb_module
         tests = []
-        #Iterate every value in the module looking for cocotb tests
+        # Iterate every value in the module looking for cocotb tests
         for obj, test_names in find_cocotb_tests(cocotb_module):
             for test_name in test_names:
                 # VUnit identifies a test by its name, e.g. in the report and the name of its output directory
                 if any(test.name == test_name.name for test in tests):
-                    raise RuntimeError(f"There are several cocotb tests named {test_name.name!r} in "
-                                       f"{cocotb_module_location}, VCST needs unique names")
-                coco_test = CocoTest(test_name.name, self.design_unit, cocotb_module, cocotb_module_location,
-                                     result_name=test_name.result_name, defining_module=test_name.module)
+                    raise RuntimeError(
+                        f"There are several cocotb tests named {test_name.name!r} in "
+                        f"{cocotb_module_location}, VCST needs unique names"
+                    )
+                coco_test = CocoTest(
+                    test_name.name,
+                    self.design_unit,
+                    cocotb_module,
+                    cocotb_module_location,
+                    result_name=test_name.result_name,
+                    defining_module=test_name.module,
+                )
                 for attr in getattr(obj, "vcst_attributes", []):
                     coco_test.add_attribute(CocoTestAttribute(attr, None))
                 tests.append(coco_test)
@@ -106,19 +117,28 @@ class CocoTestBench(TestBench):
         return test_list
 
 
-class CocoTest(object):
+class CocoTest:
     """
     TODO: Describe
     """
 
-    def __init__(self, name, design_unit, cocotb_module, cocotb_module_location, result_name=None,
-                 defining_module=None):
+    def __init__(
+        self,
+        name,
+        design_unit,
+        cocotb_module,
+        cocotb_module_location,
+        result_name=None,
+        defining_module=None,
+    ):
         self._name = name
         self._result_name = name if result_name is None else result_name
         self._defining_module = defining_module
         self._top_level = cocotb_module.top_level
         self._vhdl = design_unit.is_entity
-        self._location = FileLocation(design_unit.file_name, None, None, None) #offset, length, lineno set to None
+        self._location = FileLocation(
+            design_unit.file_name, None, None, None
+        )  # offset, length, lineno set to None
         self._cocotb_module = cocotb_module
         self._cocotb_module_location = cocotb_module_location
         self._attributes = []
@@ -154,7 +174,7 @@ class CocoTest(object):
 
     @property
     def attribute_names(self):
-        return set((attr.name for attr in self._attributes))
+        return {attr.name for attr in self._attributes}
 
     def _to_tuple(self):
         return (self._name, self._location, tuple(self._attributes))
@@ -173,6 +193,7 @@ class CocoTestConfigurationVisitor(TestConfigurationVisitor):
     """
     Override VUnit's TestConfigurationVisitor to create CocoIndependentSimTestCase objects
     """
+
     def create_tests(self, simulator_if, *args, **kwargs):
         seed, elaborate_only, test_list = _split_create_tests_args(args)
         self.create_coco_tests(simulator_if, seed, elaborate_only, test_list)

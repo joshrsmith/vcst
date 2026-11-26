@@ -6,6 +6,7 @@ kept per thread while a cocotb test simulates, and added to the environment of e
 that thread. This works the same for all simulators and doesn't depend on how a simulator interface starts its
 processes.
 """
+
 import os
 import threading
 from contextlib import contextmanager
@@ -14,9 +15,11 @@ from vunit.ostools import Process
 
 _extra_env = threading.local()
 
+
 def get_extra_env():
     """Returns the environment variables added for the test simulating in this thread, None if there are none."""
     return getattr(_extra_env, "env", None)
+
 
 @contextmanager
 def extra_env(env):
@@ -30,7 +33,9 @@ def extra_env(env):
     finally:
         _extra_env.env = None
 
+
 _process_init = Process.__init__
+
 
 def _init_with_extra_env(self, args, cwd=None, env=None):
     extra = get_extra_env()
@@ -39,5 +44,6 @@ def _init_with_extra_env(self, args, cwd=None, env=None):
         env.update(extra)
         env = {name: value for name, value in env.items() if value is not None}
     _process_init(self, args, cwd=cwd, env=env)
+
 
 Process.__init__ = _init_with_extra_env

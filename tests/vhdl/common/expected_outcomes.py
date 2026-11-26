@@ -2,6 +2,7 @@
 Runs a VCST test suite whose tests are expected to have specific outcomes, some of them failures, and makes the run
 script pass only when every test has its expected outcome.
 """
+
 import sys
 
 
@@ -17,7 +18,11 @@ def main_checking_outcomes(ui, expected):
     def post_run(results):
         report = results.get_report()
         tests = report.tests
-        full_run = ui._args.test_patterns == ["*"] and not ui._args.with_attributes and not ui._args.without_attributes
+        full_run = (
+            ui._args.test_patterns == ["*"]
+            and not ui._args.with_attributes
+            and not ui._args.without_attributes
+        )
 
         for name, test in tests.items():
             if name not in expected:

@@ -1,14 +1,16 @@
 import cocotb
+from cocotb.clock import Clock
+from cocotb.result import TestFailure, TestSuccess
+from cocotb.triggers import RisingEdge
+
 import vcst
 from vcst.utils import set_top_level
-from cocotb.triggers import RisingEdge, Timer
-from cocotb.clock import Clock
-from cocotb.result import TestSuccess, TestFailure
+
 
 @vcst.test(attributes=[".reset"])
 async def reset_test(dut):
     clock = Clock(dut.clock, 4, units="ns")
-    cocotb.fork((clock.start()))
+    cocotb.fork(clock.start())
 
     await RisingEdge(dut.clock)
     dut.reset <= 1
@@ -18,14 +20,15 @@ async def reset_test(dut):
     await RisingEdge(dut.clock)
 
     if dut.counter_value.value != 0:
-       raise TestFailure(f"Counter value did not reset to 0.")
+        raise TestFailure("Counter value did not reset to 0.")
 
     raise TestSuccess("Test passed.")
+
 
 @cocotb.test()
 async def count_test(dut):
     clock = Clock(dut.clock, 4, units="ns")
-    cocotb.fork((clock.start()))
+    cocotb.fork(clock.start())
 
     await RisingEdge(dut.clock)
     dut.reset <= 1
@@ -38,15 +41,18 @@ async def count_test(dut):
     counter_wrap = int(dut.COUNTER_WRAP.value)
     for i in range(counter_wrap):
         if dut.counter_value.value != i:
-            raise TestFailure(f"Counter value was incorrect. Expected: {i}. Actual: {dut.counter_value.value}")
+            raise TestFailure(
+                f"Counter value was incorrect. Expected: {i}. Actual: {dut.counter_value.value}"
+            )
         await RisingEdge(dut.clock)
 
     raise TestSuccess("Test passed.")
 
+
 @cocotb.test()
 async def wrap_test(dut):
     clock = Clock(dut.clock, 4, units="ns")
-    cocotb.fork((clock.start()))
+    cocotb.fork(clock.start())
 
     await RisingEdge(dut.clock)
     dut.reset <= 1
@@ -57,21 +63,18 @@ async def wrap_test(dut):
     await RisingEdge(dut.clock)
 
     counter_wrap = int(dut.COUNTER_WRAP.value)
-    for i in range(counter_wrap):
+    for _ in range(counter_wrap):
         await RisingEdge(dut.clock)
 
     if dut.counter_value.value != counter_wrap:
         raise TestFailure("Counter value did not read wrapping point.")
-    
-    await RisingEdge(dut.clock)    
+
+    await RisingEdge(dut.clock)
     if dut.counter_value.value != 0:
         raise TestFailure("Counter value did not reach wrapping point.")
 
     raise TestSuccess("Test passed.")
 
+
 ########################
 set_top_level("counter", "entity", "lib")
-
-
-
-

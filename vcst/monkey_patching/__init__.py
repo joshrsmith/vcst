@@ -1,3 +1,1 @@
-from . import environment
-from . import rivierapro
-from . import vsim
+from . import environment, rivierapro, vsim  # noqa: F401

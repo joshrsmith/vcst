@@ -2,6 +2,7 @@
 What VCST sends to a persistent vsim must be read by tcl as the value it was given, whatever the value contains. A value
 which tcl reads differently, e.g. by removing backslashes, changes what cocotb finds in its environment.
 """
+
 import random
 import shutil
 import subprocess
@@ -15,9 +16,40 @@ TCLSH = shutil.which("tclsh")
 
 # Characters special to tcl, in the context of a double quoted word and otherwise. Characters outside the Basic
 # Multilingual Plane aren't used: tcl 8.6.8 reads them from a script as several characters, whatever the script is.
-SPECIAL = ["", " ", "a b", '"', "\\", "\\\\", "\\n", "$HOME", "${a}", "$(x)", "[exit 1]", "[puts hi]", "{", "}", "{a b}",
-           ";", "a;b", "\n", "\r\n", "line1\nline2", "tab\there", "unicode: é€", "#", "\\$",
-           '"\\"', "\\x41", "\\u0041", "100%", "a\\", "\\\\\\", "^test\\.name$", "(a|b)\\1"]
+SPECIAL = [
+    "",
+    " ",
+    "a b",
+    '"',
+    "\\",
+    "\\\\",
+    "\\n",
+    "$HOME",
+    "${a}",
+    "$(x)",
+    "[exit 1]",
+    "[puts hi]",
+    "{",
+    "}",
+    "{a b}",
+    ";",
+    "a;b",
+    "\n",
+    "\r\n",
+    "line1\nline2",
+    "tab\there",
+    "unicode: é€",
+    "#",
+    "\\$",
+    '"\\"',
+    "\\x41",
+    "\\u0041",
+    "100%",
+    "a\\",
+    "\\\\\\",
+    "^test\\.name$",
+    "(a|b)\\1",
+]
 
 
 def run_tcl(script):
@@ -25,8 +57,14 @@ def run_tcl(script):
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory) / "script.tcl"
         path.write_text(script, encoding="utf-8")
-        proc = subprocess.run([TCLSH], input=f"source -encoding utf-8 {path}\n", capture_output=True, text=True,
-                              timeout=60)
+        proc = subprocess.run(
+            [TCLSH],
+            input=f"source -encoding utf-8 {path}\n",
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
     if proc.returncode != 0:
         raise AssertionError(f"tclsh failed: {proc.stderr}\n{script[:2000]}")
     return proc.stdout.splitlines()
@@ -58,7 +96,9 @@ class TclQuote(unittest.TestCase):
     def test_tcl_reads_the_value_back(self):
         rng = random.Random(20261125)
         alphabet = list('\\"$[]{};# \n\r\tabAB09é')
-        values = SPECIAL + ["".join(rng.choice(alphabet) for _ in range(rng.randint(0, 40))) for _ in range(300)]
+        values = SPECIAL + [
+            "".join(rng.choice(alphabet) for _ in range(rng.randint(0, 40))) for _ in range(300)
+        ]
         script = "".join(f"set x {tcl_quote(value)}\n{hex_of('$x')}\n" for value in values)
         read = [bytes.fromhex(line).decode("utf-8") for line in run_tcl(script)]
         self.assertEqual(len(read), len(values))
@@ -76,8 +116,10 @@ class SetEnvVar(unittest.TestCase):
         for name in env:
             script += f"if {{[info exists ::env({name})]}} {{ {hex_of(f'$::env({name})')} }} else {{ puts UNSET }}\n"
         output = run_tcl(script)
-        return {name: (None if line == "UNSET" else bytes.fromhex(line).decode("utf-8"))
-                for name, line in zip(env, output)}
+        return {
+            name: (None if line == "UNSET" else bytes.fromhex(line).decode("utf-8"))
+            for name, line in zip(env, output)
+        }
 
     def test_values_reach_tcl_unchanged_also_when_longer_than_a_write(self):
         # Values are written in pieces, which must not split what tcl reads as one character
@@ -92,8 +134,10 @@ class SetEnvVar(unittest.TestCase):
         self.assertEqual(self.values_after(env), env)
 
     def test_none_removes_the_variable(self):
-        self.assertEqual(self.values_after({"VCST_REMOVED": None, "VCST_SET": "1"}, preset=["VCST_REMOVED"]),
-                         {"VCST_REMOVED": None, "VCST_SET": "1"})
+        self.assertEqual(
+            self.values_after({"VCST_REMOVED": None, "VCST_SET": "1"}, preset=["VCST_REMOVED"]),
+            {"VCST_REMOVED": None, "VCST_SET": "1"},
+        )
 
     def test_removing_a_variable_which_is_not_set_is_not_an_error(self):
         self.assertEqual(self.values_after({"VCST_NEVER_SET": None}), {"VCST_NEVER_SET": None})

@@ -1,6 +1,7 @@
 """
 Helpers hiding the differences between the supported versions of cocotb (1.8 and later).
 """
+
 import os
 import re
 import sys
@@ -15,18 +16,24 @@ COCOTB2 = COCOTB_VERSION >= (2, 0)
 COCOTB_SUPPORTS_NVC = COCOTB_VERSION >= (1, 9)
 
 if COCOTB2:
+    # isort: off
     import cocotb.triggers  # cocotb 2.0 fails to import cocotb.regression first because of a circular import
     import cocotb.regression
     import cocotb_tools.config as cocotb_config
 
+    # isort: on
+
     # cocotb 2.0 calls the object created by @cocotb.parametrize Parameterized, cocotb 2.1 calls it TestGenerator
     # and also uses it for unparameterized tests.
     _TEST_GENERATOR_TYPES = tuple(
-        getattr(cocotb.regression, name) for name in ("TestGenerator", "Parameterized") if hasattr(cocotb.regression, name)
+        getattr(cocotb.regression, name)
+        for name in ("TestGenerator", "Parameterized")
+        if hasattr(cocotb.regression, name)
     )
 else:
     import cocotb.config as cocotb_config
     from cocotb.decorators import test as _Cocotb1Test
+
 
 class CocotbTestName:
     """
@@ -34,20 +41,25 @@ class CocotbTestName:
     and result_name the name of the test in the cocotb results file. module is the name of the module defining the
     test, which cocotb 2.x selects the test by, if it is another module than the one whose tests are run, else None.
     """
+
     def __init__(self, name, result_name=None, module=None):
         self.name = name
         self.result_name = name if result_name is None else result_name
         self.module = module
+
 
 def find_cocotb_tests(module):
     """
     Returns (test_object, test_names) for every module level object which cocotb would run as test(s), in definition
     order. test_object is the object found in the module, test_names the CocotbTestNames of the tests it expands to.
     """
+
     def cocotb2_test_name(test):
         # cocotb 2.x names a test after the module defining it, which differs for a test imported from another module
         defined_in = getattr(test, "module", module.__name__)
-        return CocotbTestName(test.name, module=None if defined_in == module.__name__ else defined_in)
+        return CocotbTestName(
+            test.name, module=None if defined_in == module.__name__ else defined_in
+        )
 
     found = []
     for attr_name, obj in vars(module).items():
@@ -61,6 +73,7 @@ def find_cocotb_tests(module):
             found.append((obj, [CocotbTestName(attr_name, obj.__qualname__)]))
     return found
 
+
 def test_selection_environ(module_name, test_names, top_level, seed, test_modules=None):
     """
     Returns the environment variables selecting the module, tests (names used to select tests), top level and
@@ -72,7 +85,8 @@ def test_selection_environ(module_name, test_names, top_level, seed, test_module
         environ = {
             "COCOTB_TEST_MODULES": module_name,
             "COCOTB_TEST_FILTER": "|".join(
-                f"^{re.escape(test_modules.get(name) or module_name)}\\.{re.escape(name)}$" for name in test_names
+                f"^{re.escape(test_modules.get(name) or module_name)}\\.{re.escape(name)}$"
+                for name in test_names
             ),
             "COCOTB_TOPLEVEL": top_level,
             # Removed, as cocotb refuses to run if it is set as well as COCOTB_TEST_FILTER
@@ -94,9 +108,11 @@ def test_selection_environ(module_name, test_names, top_level, seed, test_module
             environ["RANDOM_SEED"] = str(seed)
     return environ
 
+
 def seed_variable():
     """Returns the name of the environment variable a user sets to choose the cocotb random seed."""
     return "COCOTB_RANDOM_SEED" if COCOTB2 else "RANDOM_SEED"
+
 
 def gpi_environ(environ):
     """
@@ -116,9 +132,12 @@ def gpi_environ(environ):
     libpython = environ.get("LIBPYTHON_LOC")
     if libpython is None:
         import find_libpython  # A cocotb dependency
+
         libpython = find_libpython.find_libpython()
         if libpython is None:
-            raise RuntimeError("Unable to find libpython, please make sure the appropriate libpython is installed")
+            raise RuntimeError(
+                "Unable to find libpython, please make sure the appropriate libpython is installed"
+            )
 
     if has_pygpi_entry_point:
         # cocotb 2.1 and later
@@ -127,6 +146,7 @@ def gpi_environ(environ):
         gpi_env["LIBPYTHON_LOC"] = libpython
 
     return gpi_env
+
 
 def gpi_lib(interface, simulator):
     """

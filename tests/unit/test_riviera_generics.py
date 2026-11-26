@@ -2,6 +2,7 @@
 VCST gives the generics of a VHDL top level to Riviera-PRO as VUnit does, except that a list becomes an aggregate. A
 Verilog top level also gets its strings quoted, which Riviera-PRO needs for string parameters.
 """
+
 import importlib.util
 import unittest
 
@@ -26,8 +27,24 @@ class FormatGeneric(unittest.TestCase):
 
     def test_values_of_a_vhdl_top_level_are_formatted_as_vunit_does(self):
         reference = vunit_format_generic()
-        values = [0, 16, -3, 3.5, True, False, "FAST", "x\"00FF\"", "'1'", "(FOO,BAR)", "data/file.txt", "hello world",
-                  "a  b", " ", "", 1e-9]
+        values = [
+            0,
+            16,
+            -3,
+            3.5,
+            True,
+            False,
+            "FAST",
+            'x"00FF"',
+            "'1'",
+            "(FOO,BAR)",
+            "data/file.txt",
+            "hello world",
+            "a  b",
+            " ",
+            "",
+            1e-9,
+        ]
         for value in values:
             with self.subTest(value=value):
                 self.assertEqual(rivierapro.format_generic(value), reference(value))

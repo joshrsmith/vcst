@@ -1,6 +1,7 @@
-#Adds the VHDL builtins explicitly, as VUnit 5 requires, rather than letting VCST add them
-from pathlib import Path
+# Adds the VHDL builtins explicitly, as VUnit 5 requires, rather than letting VCST add them
 import os
+from pathlib import Path
+
 from vcst import VCST
 
 root = Path(os.path.abspath(Path(__file__).parent))

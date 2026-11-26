@@ -1,19 +1,24 @@
 import logging
+
 from vunit.ui.library import Library
+
 from ..test.bench import CocoTestBench
 
 LOGGER = logging.getLogger(__name__)
 
 
 class VCSTLibrary(Library):
-
     def add_cocotb_testbench(self, design_unit, cocotb_module, cocotb_module_location):
         """
         Adds a test bench running the tests of cocotb_module with design_unit as top level.
         """
         # The database holds the test history, from which --seed repeat takes the seeds of the previous run
-        test_bench = CocoTestBench(design_unit, cocotb_module, cocotb_module_location,
-                                   database=self._test_bench_list._database)
+        test_bench = CocoTestBench(
+            design_unit,
+            cocotb_module,
+            cocotb_module_location,
+            database=self._test_bench_list._database,
+        )
         self._test_bench_list._add_test_bench(test_bench)
         return self.test_bench(design_unit.name)
 
