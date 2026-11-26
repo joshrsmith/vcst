@@ -12,6 +12,8 @@ cover:
 - failing assertions, exceptions, tests failing to start and timeouts
 - `expect_fail` and `expect_error`, and with cocotb 2.1 `xfail` and a test that skips itself while it runs, which passes
   as VUnit counts a test it runs as failed unless it passed
+- tests that end the simulation with an HDL assertion failure, with and without expecting it (`expect_error=SimFailure`),
+  and a simulator that exits with a non-zero status after a test passed, which VCST reports as passed
 - tests with names that are suffixes of other test names, which must not be selected with them
 - parametrized tests (`cocotb.parametrize` with cocotb 2.x), whose names contain `/`, `=` and `.`, and tests generated
   with `TestFactory` (cocotb 1.x)

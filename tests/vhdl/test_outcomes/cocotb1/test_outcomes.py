@@ -1,7 +1,11 @@
 # Tests with known outcomes, checked by run.py, showing that VCST selects each test exactly and reports what cocotb
 # reports for it.
+import atexit
+import os
+
 import cocotb
 from cocotb.regression import TestFactory
+from cocotb.result import SimFailure
 from cocotb.triggers import Timer
 
 from vcst.utils import set_top_level
@@ -78,6 +82,35 @@ async def expect_error_not_raised(dut):
     await run_alone("expect_error_not_raised")
 
 
+# The HDL ends the simulation with an assertion failure, so the simulator exits with a non-zero status. cocotb reports
+# the test as passed if it expected that, and as failed if it didn't.
+@cocotb.test(expect_error=SimFailure)
+async def expect_sim_failure_ended(dut):
+    await run_alone("expect_sim_failure_ended")
+    dut.trigger_failure.value = 1
+    await Timer(10, units="ns")
+
+
+@cocotb.test()
+async def sim_failure_not_expected(dut):
+    await run_alone("sim_failure_not_expected")
+    dut.trigger_failure.value = 1
+    await Timer(10, units="ns")
+
+
+# Fails, as the simulation doesn't end
+@cocotb.test(expect_error=SimFailure)
+async def expect_sim_failure_not_ended(dut):
+    await run_alone("expect_sim_failure_not_ended")
+
+
+# The simulator exits with a non-zero status when it shuts down, after cocotb wrote its results. The test passed.
+@cocotb.test()
+async def simulator_fails_after_test(dut):
+    await run_alone("simulator_fails_after_test")
+    atexit.register(lambda: os._exit(3))
+
+
 @cocotb.test(timeout_time=10, timeout_unit="ns")
 async def timing_out(dut):
     await run_alone("timing_out")
@@ -112,6 +145,8 @@ expect(
     "ing",
     "expect_fail_failing",
     "expect_error_raised",
+    "expect_sim_failure_ended",
+    "simulator_fails_after_test",
     "skipped",
     "alias_of_passing",
     "factory_test_001",
@@ -123,6 +158,8 @@ expect(
     "fails_to_start",
     "expect_fail_passing",
     "expect_error_not_raised",
+    "sim_failure_not_expected",
+    "expect_sim_failure_not_ended",
     "timing_out",
     "alias_of_failing",
     "factory_test_002",
