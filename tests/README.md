@@ -3,7 +3,7 @@
 Every suite is a run script or a check script that exits with 1 unless all its tests have their expected outcomes. The
 suites that run a simulator use the one selected by `VUNIT_SIMULATOR`, like VUnit. Where a cocotb test module needs
 different code for cocotb 1.x and 2.x, the suite has a `cocotb1` and a `cocotb2` directory, and its run script picks the
-one matching the installed cocotb, see the top-level [README](../README.md#tests).
+one matching the installed cocotb, see the top-level [README](../README.md#testing).
 
 Where to find what each suite covers:
 
