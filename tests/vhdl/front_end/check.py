@@ -1,6 +1,10 @@
 """
 Checks the VCST command line and run script interface, which differs between VUnit 4.7 and 5, by running the run
-scripts of this directory with different arguments.
+scripts of this directory with different arguments. It checks `from_argv` and `from_args` with and without
+`compile_builtins`, the rejection of unknown options, attribute selection, `--list`, `--export-json`, `--elaborate`,
+random seeds (`--seed`, `--seed repeat` and the `seed` simulation option), `--changed` with changes in the Python
+files of cocotb modules (with VUnit 5), a `COCOTB_TESTCASE` set by the user, tests with the same
+name, cocotb modules with the same file name in different directories and a second cocotb module for a top level.
 
 Usage: python check.py [-p N] [--output-path DIR]
 

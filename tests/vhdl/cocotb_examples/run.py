@@ -1,3 +1,4 @@
+# Runs cocotb examples: a D flip-flop, and an adder in two configurations of its data width.
 import os
 from pathlib import Path
 
