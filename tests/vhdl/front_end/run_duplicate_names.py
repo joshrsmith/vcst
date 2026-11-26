@@ -1,6 +1,7 @@
-#Adds a cocotb module with two tests of the same name (cocotb 2.x), which VCST refuses
-from pathlib import Path
+# Adds a cocotb module with two tests of the same name (cocotb 2.x), which VCST refuses
 import os
+from pathlib import Path
+
 from vcst import VCST
 
 root = Path(os.path.abspath(Path(__file__).parent))

@@ -3,6 +3,7 @@ VCST selects the tests of a cocotb run by name, and must select exactly the test
 a name which is the end of another name, or contains characters special to regular expressions, must not select other
 tests. The tests are real cocotb tests, found as VCST finds them.
 """
+
 import importlib
 import os
 import re
@@ -63,6 +64,7 @@ for index, name in enumerate(["a.b", "aXb", "a+b", "aab", "(x)", "a|b", "ab", "x
 
 class Modules:
     """Writes modules to a directory, imports them and removes them from sys.modules when done"""
+
     def __init__(self, test_case, **sources):
         directory = Path(tempfile.mkdtemp(prefix="vcst_unit_"))
         test_case.addCleanup(shutil.rmtree, directory, True)
@@ -84,28 +86,45 @@ class Cocotb2Filter(unittest.TestCase):
         """Returns the names of the tests the filter VCST gives cocotb selects, among all tests of the module"""
         environ = test_selection_environ(module.__name__, names, "top", None, test_modules)
         test_filter = re.compile(environ["COCOTB_TEST_FILTER"])
-        tests = [test for obj, test_names in find_cocotb_tests(module) for test in self.expand_generators(obj, test_names)]
+        tests = [
+            test
+            for obj, test_names in find_cocotb_tests(module)
+            for test in self.expand_generators(obj, test_names)
+        ]
         return sorted(test.name for test in tests if test_filter.search(test.fullname))
 
     @staticmethod
     def expand_generators(obj, test_names):
         import cocotb.regression
+
         generate = getattr(obj, "generate_tests", None)
-        return list(generate()) if generate and not isinstance(obj, cocotb.regression.Test) else [obj]
+        return (
+            list(generate()) if generate and not isinstance(obj, cocotb.regression.Test) else [obj]
+        )
 
     def test_only_the_tests_asked_for_are_selected(self):
         modules = Modules(self, vcst_unit_main=MAIN_MODULE, vcst_unit_other=OTHER_MODULE).modules
         main = modules["vcst_unit_main"]
-        names = {name.name: name for _, test_names in find_cocotb_tests(main) for name in test_names}
+        names = {
+            name.name: name for _, test_names in find_cocotb_tests(main) for name in test_names
+        }
         test_modules = {name: test.module for name, test in names.items()}
-        for wanted in (["plain"], ["fail"], ["expect_fail"], ["fail", "tail_plain"], ["imported"],
-                       ["plain", "imported"]):
+        for wanted in (
+            ["plain"],
+            ["fail"],
+            ["expect_fail"],
+            ["fail", "tail_plain"],
+            ["imported"],
+            ["plain", "imported"],
+        ):
             with self.subTest(wanted=wanted):
                 self.assertEqual(self.select(main, wanted, test_modules), sorted(wanted))
 
     def test_names_with_characters_special_to_regular_expressions(self):
         module = Modules(self, vcst_unit_named=NAMED_MODULE).modules["vcst_unit_named"]
-        all_names = sorted(name.name for _, test_names in find_cocotb_tests(module) for name in test_names)
+        all_names = sorted(
+            name.name for _, test_names in find_cocotb_tests(module) for name in test_names
+        )
         self.assertGreater(len(all_names), 10)
         for wanted in all_names:
             with self.subTest(wanted=wanted):
@@ -120,8 +139,12 @@ class Cocotb2Filter(unittest.TestCase):
         self.assertNotIn("TESTCASE", environ)
 
     def test_no_seed_is_left_to_cocotb(self):
-        self.assertNotIn("COCOTB_RANDOM_SEED", test_selection_environ("module", ["test"], "top", None))
-        self.assertEqual(test_selection_environ("module", ["test"], "top", 42)["COCOTB_RANDOM_SEED"], "42")
+        self.assertNotIn(
+            "COCOTB_RANDOM_SEED", test_selection_environ("module", ["test"], "top", None)
+        )
+        self.assertEqual(
+            test_selection_environ("module", ["test"], "top", 42)["COCOTB_RANDOM_SEED"], "42"
+        )
 
 
 @unittest.skipIf(COCOTB2, "cocotb 1.x selects tests by their names in the module")
@@ -139,7 +162,9 @@ class Cocotb1Selection(unittest.TestCase):
     def test_x_and_z_resolve_to_zero_unless_the_user_chose(self):
         with mock.patch.dict(os.environ):
             os.environ.pop("COCOTB_RESOLVE_X", None)
-            self.assertEqual(test_selection_environ("m", ["t"], "top", None)["COCOTB_RESOLVE_X"], "ZEROS")
+            self.assertEqual(
+                test_selection_environ("m", ["t"], "top", None)["COCOTB_RESOLVE_X"], "ZEROS"
+            )
             os.environ["COCOTB_RESOLVE_X"] = "ERROR"
             self.assertNotIn("COCOTB_RESOLVE_X", test_selection_environ("m", ["t"], "top", None))
 

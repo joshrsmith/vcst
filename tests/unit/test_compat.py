@@ -2,6 +2,7 @@
 What VCST gives the simulator's cocotb to embed the Python running VCST, which differs between versions of cocotb,
 while respecting what the user has set.
 """
+
 import sys
 import unittest
 from unittest import mock
@@ -15,7 +16,9 @@ LIBPYTHON = "/user/libpython.so"
 
 class GpiEnviron(unittest.TestCase):
     def test_the_python_running_vcst_is_given_to_the_gpi(self):
-        self.assertEqual(gpi_environ({"LIBPYTHON_LOC": LIBPYTHON})["PYGPI_PYTHON_BIN"], sys.executable)
+        self.assertEqual(
+            gpi_environ({"LIBPYTHON_LOC": LIBPYTHON})["PYGPI_PYTHON_BIN"], sys.executable
+        )
 
     def test_libpython_of_the_user_is_used(self):
         environ = gpi_environ({"LIBPYTHON_LOC": LIBPYTHON})
@@ -36,18 +39,29 @@ class GpiEnviron(unittest.TestCase):
 
     @unittest.skipIf(COCOTB2, "only cocotb 1.x finds a virtual environment through VIRTUAL_ENV")
     def test_a_virtual_environment_which_isnt_activated_is_given_to_cocotb_1(self):
-        with mock.patch.object(sys, "prefix", "/some/venv"), mock.patch.object(sys, "base_prefix", "/usr"):
+        with (
+            mock.patch.object(sys, "prefix", "/some/venv"),
+            mock.patch.object(sys, "base_prefix", "/usr"),
+        ):
             self.assertEqual(gpi_environ({"LIBPYTHON_LOC": LIBPYTHON})["VIRTUAL_ENV"], "/some/venv")
-            self.assertNotIn("VIRTUAL_ENV", gpi_environ({"LIBPYTHON_LOC": LIBPYTHON, "VIRTUAL_ENV": "/other"}))
+            self.assertNotIn(
+                "VIRTUAL_ENV", gpi_environ({"LIBPYTHON_LOC": LIBPYTHON, "VIRTUAL_ENV": "/other"})
+            )
 
     @unittest.skipIf(COCOTB2, "only cocotb 1.x finds a virtual environment through VIRTUAL_ENV")
     def test_no_virtual_environment_is_given_outside_one(self):
-        with mock.patch.object(sys, "prefix", "/usr"), mock.patch.object(sys, "base_prefix", "/usr"):
+        with (
+            mock.patch.object(sys, "prefix", "/usr"),
+            mock.patch.object(sys, "base_prefix", "/usr"),
+        ):
             self.assertNotIn("VIRTUAL_ENV", gpi_environ({"LIBPYTHON_LOC": LIBPYTHON}))
 
     @unittest.skipUnless(COCOTB2, "cocotb 2 doesn't need VIRTUAL_ENV")
     def test_cocotb_2_isnt_given_a_virtual_environment(self):
-        with mock.patch.object(sys, "prefix", "/some/venv"), mock.patch.object(sys, "base_prefix", "/usr"):
+        with (
+            mock.patch.object(sys, "prefix", "/some/venv"),
+            mock.patch.object(sys, "base_prefix", "/usr"),
+        ):
             self.assertNotIn("VIRTUAL_ENV", gpi_environ({"LIBPYTHON_LOC": LIBPYTHON}))
 
 

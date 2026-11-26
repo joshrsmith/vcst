@@ -1,16 +1,23 @@
 import hashlib
 import os
 import re
-from pathlib import Path
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
-from vunit.test.report import PASSED, SKIPPED, FAILED
 from vunit.ostools import write_file
 from vunit.sim_if.vsim_simulator_mixin import fix_path
-from vunit.test.suites import IndependentSimTestCase, TestRun, get_result_file_name as get_vunit_result_file_name
+from vunit.test.report import FAILED, PASSED, SKIPPED
+from vunit.test.suites import (
+    IndependentSimTestCase,
+    TestRun,
+)
+from vunit.test.suites import (
+    get_result_file_name as get_vunit_result_file_name,
+)
 
 from ..monkey_patching.environment import extra_env
 from ..utils.compat import gpi_environ, gpi_lib, seed_variable, test_selection_environ
+
 
 class IndependentCocoSimTestCase(IndependentSimTestCase):
     def __init__(self, test, config, simulator_if, elaborate_only=False, seed=None):
@@ -24,7 +31,7 @@ class IndependentCocoSimTestCase(IndependentSimTestCase):
             simulator_if=simulator_if,
             config=config,
             elaborate_only=elaborate_only,
-            cocotb_module = test._cocotb_module,
+            cocotb_module=test._cocotb_module,
             cocotb_module_location=test._cocotb_module_location,
             test_suite_name=self._name,
             test_cases=[test.name],
@@ -49,8 +56,23 @@ class IndependentCocoSimTestCase(IndependentSimTestCase):
 
         return name
 
+
 class CocoTestRun(TestRun):
-    def __init__(self, vhdl, top_level, simulator_if, config, elaborate_only, cocotb_module, cocotb_module_location, test_suite_name, test_cases, result_names=None, test_modules=None, seed=None):
+    def __init__(
+        self,
+        vhdl,
+        top_level,
+        simulator_if,
+        config,
+        elaborate_only,
+        cocotb_module,
+        cocotb_module_location,
+        test_suite_name,
+        test_cases,
+        result_names=None,
+        test_modules=None,
+        seed=None,
+    ):
         # TestRun.__init__ differs between VUnit versions, so set its attributes directly
         self._simulator_if = simulator_if
         self._config = config
@@ -91,16 +113,19 @@ class CocoTestRun(TestRun):
             top_level = self._top_level
 
         cocotb_seed = None if seed_variable() in os.environ else _get_cocotb_seed(seed)
-        environ.update(test_selection_environ(mod_name, self._test_cases, top_level, cocotb_seed,
-                                              self._test_modules))
+        environ.update(
+            test_selection_environ(
+                mod_name, self._test_cases, top_level, cocotb_seed, self._test_modules
+            )
+        )
 
         return environ
 
     def configure_simulator(self, config, environ):
         """
-            Sets simulator flags to load the VPI/VHPI/FLI interfaces as appropriate. Also sets environment
-            variables related to those interfaces.
-            TODO: Support more simulators.
+        Sets simulator flags to load the VPI/VHPI/FLI interfaces as appropriate. Also sets environment
+        variables related to those interfaces.
+        TODO: Support more simulators.
         """
         if self._simulator_if.name == "ghdl":
             append_sim_options(config, "ghdl.sim_flags", [f"--vpi={gpi_lib('vpi', 'ghdl')}"])
@@ -109,16 +134,22 @@ class CocoTestRun(TestRun):
             append_sim_options(config, "nvc.sim_flags", [f"--load={gpi_lib('vhpi', 'nvc')}"])
 
         if self._simulator_if.name == "modelsim":
-            append_vsim_flags(config, "modelsim", [f"-foreign \"cocotb_init {gpi_lib('fli', 'questa')}\""])
+            append_vsim_flags(
+                config, "modelsim", [f'-foreign "cocotb_init {gpi_lib("fli", "questa")}"']
+            )
 
         if self._simulator_if.name == "rivierapro":
             append_vsim_flags(config, "rivierapro", ["+access", "+w", "-interceptcoutput", "-O2"])
 
             # Quoted for tcl, as VUnit quotes the libraries of its pli option
             if self._vhdl:
-                append_vsim_flags(config, "rivierapro", [f"-loadvhpi \"{fix_path(gpi_lib('vhpi', 'riviera'))}\""])
+                append_vsim_flags(
+                    config, "rivierapro", [f'-loadvhpi "{fix_path(gpi_lib("vhpi", "riviera"))}"']
+                )
             else:
-                append_vsim_flags(config, "rivierapro", [f"-pli \"{fix_path(gpi_lib('vpi', 'riviera'))}\""])
+                append_vsim_flags(
+                    config, "rivierapro", [f'-pli "{fix_path(gpi_lib("vpi", "riviera"))}"']
+                )
 
     def run(self, output_path, read_output, *args, **kwargs):
         """
@@ -132,7 +163,9 @@ class CocoTestRun(TestRun):
 
         # VUnit 5 gives each test a seed, passed to the pre_config hook and on to cocotb
         seed = self.get_seed() if hasattr(TestRun, "get_seed") else None
-        pre_config_args = (output_path, self._simulator_if.output_path) + (() if seed is None else (seed,))
+        pre_config_args = (output_path, self._simulator_if.output_path) + (
+            () if seed is None else (seed,)
+        )
         if not self._config.call_pre_config(*pre_config_args):
             return results
 
@@ -210,10 +243,12 @@ class CocoTestRun(TestRun):
 
         return results
 
+
 def append_sim_options(config, name, value):
-    sim_flags  = config.sim_options.get(name, [])
-    sim_flags  = sim_flags + value
+    sim_flags = config.sim_options.get(name, [])
+    sim_flags = sim_flags + value
     config.set_sim_option(name, sim_flags)
+
 
 def append_vsim_flags(config, simulator_name, value):
     """
@@ -224,8 +259,10 @@ def append_vsim_flags(config, simulator_name, value):
     if f"{simulator_name}.vsim_flags.gui" in config.sim_options:
         append_sim_options(config, f"{simulator_name}.vsim_flags.gui", value)
 
+
 def get_result_file_name(output_path):
     return str(Path(output_path) / "cocotb_results.xml")
+
 
 def _get_cocotb_seed(seed):
     """

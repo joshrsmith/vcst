@@ -2,6 +2,7 @@
 The seed VUnit gives a test becomes the seed of cocotb, so that a run can be repeated with --seed, the seed simulation
 option or a seed reported by cocotb.
 """
+
 import os
 import subprocess
 import sys
@@ -28,11 +29,16 @@ class CocotbSeed(unittest.TestCase):
         self.assertEqual(_get_cocotb_seed("4294967295"), 4294967295)
 
     def test_any_other_string_gives_a_number_cocotb_accepts(self):
-        seeds = {text: _get_cocotb_seed(text) for text in ("any seed", "other", "", "0x1F", "-1", "1.5", "g" * 16)}
+        seeds = {
+            text: _get_cocotb_seed(text)
+            for text in ("any seed", "other", "", "0x1F", "-1", "1.5", "g" * 16)
+        }
         for value in seeds.values():
             self.assertIsInstance(value, int)
             self.assertTrue(0 <= value < 2**32)
-        self.assertEqual(len(set(seeds.values())), len(seeds), "different strings should give different seeds")
+        self.assertEqual(
+            len(set(seeds.values())), len(seeds), "different strings should give different seeds"
+        )
 
     def test_the_same_string_gives_the_same_seed_in_every_process(self):
         # Python's own hash of a string changes from process to process, which would make the run unrepeatable
@@ -40,7 +46,9 @@ class CocotbSeed(unittest.TestCase):
         values = set()
         for hash_seed in ("1", "2", "random"):
             env = {**os.environ, "PYTHONHASHSEED": hash_seed}
-            proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env, timeout=120)
+            proc = subprocess.run(
+                [sys.executable, "-c", code], capture_output=True, text=True, env=env, timeout=120
+            )
             self.assertEqual(proc.returncode, 0, proc.stderr)
             values.add(int(proc.stdout))
         values.add(_get_cocotb_seed("any seed"))

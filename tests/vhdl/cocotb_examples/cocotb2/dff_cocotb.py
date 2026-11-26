@@ -25,6 +25,7 @@
 # limitations under the License.
 # ==============================================================================
 import random
+
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
@@ -108,7 +109,7 @@ class DFF_TB:
     def check(self):
         self.input_mon.stop()
         self.output_mon.stop()
-        assert self.received_output == self.expected_output[:len(self.received_output)]
+        assert self.received_output == self.expected_output[: len(self.received_output)]
         assert len(self.received_output) == len(self.expected_output)
 
 

@@ -5,6 +5,7 @@ Usage: python run.py [-p N] [--output-path DIR]
 
 -p and --output-path are accepted as by the other run scripts and aren't used. Exits with 1 if a test fails.
 """
+
 import argparse
 import sys
 import unittest

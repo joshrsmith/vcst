@@ -4,12 +4,13 @@ from typing import Optional
 import cocotb
 from vunit import VUnit
 
-from .library import VCSTLibrary
 from ..utils.compat import COCOTB_SUPPORTS_NVC
 from ..utils.mod_utils import import_mod
+from .library import VCSTLibrary
 
 # VUnit 4.x adds the VHDL builtins unless compile_builtins=False, VUnit 5 only when asked to
 _VUNIT_HAS_COMPILE_BUILTINS = "compile_builtins" in inspect.signature(VUnit.__init__).parameters
+
 
 class VCST(VUnit):
     # Set while VUnit.from_argv creates the object with from_args, see from_argv
@@ -35,7 +36,9 @@ class VCST(VUnit):
         cls._builtins_added_by_from_argv = True
         try:
             if _VUNIT_HAS_COMPILE_BUILTINS:
-                vcst_obj = super().from_argv(argv=argv, compile_builtins=False, vhdl_standard=vhdl_standard)
+                vcst_obj = super().from_argv(
+                    argv=argv, compile_builtins=False, vhdl_standard=vhdl_standard
+                )
             else:
                 vcst_obj = super().from_argv(argv=argv, vhdl_standard=vhdl_standard)
         finally:
@@ -83,7 +86,6 @@ class VCST(VUnit):
             raise KeyError(library_name)
         return VCSTLibrary(library_name, self, self._project, self._test_bench_list)
 
-
     def add_cocotb_testbench(self, cocotb_module_location, cocotb_module=None):
         """Adds a cocotb module to a library based on variables defined in the cocotb module."""
         top_level = None
@@ -91,38 +93,52 @@ class VCST(VUnit):
         top_level_library = None
 
         if cocotb_module is None:
-           cocotb_module = import_mod(cocotb_module_location)
+            cocotb_module = import_mod(cocotb_module_location)
 
         if hasattr(cocotb_module, "top_level"):
-            top_level = getattr(cocotb_module, "top_level")
+            top_level = cocotb_module.top_level
         else:
             raise RuntimeError(f"top_level not defined in cocotb module {cocotb_module}")
 
         if hasattr(cocotb_module, "top_level_type"):
-            top_level_type = getattr(cocotb_module, "top_level_type")
+            top_level_type = cocotb_module.top_level_type
         else:
             raise RuntimeError(f"top_level_type not defined in cocotb module {cocotb_module}")
 
         if hasattr(cocotb_module, "top_level_library"):
-            top_level_library = getattr(cocotb_module, "top_level_library")
+            top_level_library = cocotb_module.top_level_library
         else:
             raise RuntimeError(f"top_level_library not defined in cocotb module {cocotb_module}")
 
         if not isinstance(top_level, str):
-            raise RuntimeError(f"top_level defined in cocotb module should be a string {cocotb_module}")
+            raise RuntimeError(
+                f"top_level defined in cocotb module should be a string {cocotb_module}"
+            )
 
         if not isinstance(top_level_type, str):
-            raise RuntimeError(f"top_level_type defined in cocotb module should be a string {cocotb_module}")
+            raise RuntimeError(
+                f"top_level_type defined in cocotb module should be a string {cocotb_module}"
+            )
 
         if not isinstance(top_level_library, str):
-            raise RuntimeError(f"top_level_library defined in cocotb module should be a string {cocotb_module}")
+            raise RuntimeError(
+                f"top_level_library defined in cocotb module should be a string {cocotb_module}"
+            )
 
         if top_level_type not in ("entity", "module"):
-            raise RuntimeError(f"Invalid top level type {top_level_type} in cocotb module {cocotb_module} specified. Please specify either entity or module.")
+            raise RuntimeError(
+                f"Invalid top level type {top_level_type} in cocotb module {cocotb_module} specified. Please specify either entity or module."
+            )
 
         simulator_class = self._simulator_class
-        if simulator_class is not None and simulator_class.name == "nvc" and not COCOTB_SUPPORTS_NVC:
-            raise RuntimeError(f"NVC needs cocotb 1.9 or later, cocotb {cocotb.__version__} is installed")
+        if (
+            simulator_class is not None
+            and simulator_class.name == "nvc"
+            and not COCOTB_SUPPORTS_NVC
+        ):
+            raise RuntimeError(
+                f"NVC needs cocotb 1.9 or later, cocotb {cocotb.__version__} is installed"
+            )
 
         library = self.library(top_level_library)
         top_level_design_unit = None
@@ -132,4 +148,6 @@ class VCST(VUnit):
         else:
             top_level_design_unit = library.module(top_level, test_bench=False)
 
-        return library.add_cocotb_testbench(top_level_design_unit, cocotb_module, cocotb_module_location)
+        return library.add_cocotb_testbench(
+            top_level_design_unit, cocotb_module, cocotb_module_location
+        )

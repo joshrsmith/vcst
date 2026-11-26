@@ -3,6 +3,7 @@ import cocotb
 from .utils.compat import COCOTB2
 
 if COCOTB2:
+
     def test(obj=None, *, attributes=None, **kwargs):
         """
         Wrapper around cocotb.test() (https://docs.cocotb.org/en/stable/library_reference.html#cocotb.test) which
@@ -11,6 +12,7 @@ if COCOTB2:
         Used as ``@vcst.test(..., attributes=['.long_running'])`` in lieu of ``@cocotb.test(...)``. The attributes
         apply to every test the decorated function produces, e.g. when combined with ``@cocotb.parametrize``.
         """
+
         def add_attributes(cocotb_test):
             cocotb_test.vcst_attributes = list(attributes) if attributes is not None else []
             return cocotb_test
@@ -32,6 +34,9 @@ else:
 
         Used as ``@vcst.test(..., attributes=['.long_running'])`` in lieu of ``@cocotb.test(...)``.
         """
+
         def __init__(self, *args, **kwargs):
-            self.vcst_attributes = list(kwargs.pop("attributes", None) or [])  # cocotb's constructor would error on it
+            self.vcst_attributes = list(
+                kwargs.pop("attributes", None) or []
+            )  # cocotb's constructor would error on it
             super().__init__(*args, **kwargs)

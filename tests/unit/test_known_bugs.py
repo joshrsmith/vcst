@@ -3,6 +3,7 @@ Behaviour VCST should have and doesn't, found by reading and trying (see the not
 Each test is expected to fail. When a fix makes one pass, unittest reports an unexpected success and the run fails, so
 that the decorator is removed together with the fix.
 """
+
 import os
 import sys
 import tempfile
@@ -32,9 +33,17 @@ class KnownBugs(unittest.TestCase):
     @unittest.expectedFailure
     def test_a_relative_cocotb_module_location_gives_an_absolute_python_path(self):
         # The simulator runs in another directory than the run script, where a relative path finds nothing
-        run = CocoTestRun(vhdl=True, top_level="top", simulator_if=SimpleNamespace(name="ghdl"), config=None,
-                          elaborate_only=False, cocotb_module=None, cocotb_module_location="relative/dir/module",
-                          test_suite_name="lib.top", test_cases=["test"])
+        run = CocoTestRun(
+            vhdl=True,
+            top_level="top",
+            simulator_if=SimpleNamespace(name="ghdl"),
+            config=None,
+            elaborate_only=False,
+            cocotb_module=None,
+            cocotb_module_location="relative/dir/module",
+            test_suite_name="lib.top",
+            test_cases=["test"],
+        )
         with mock.patch.dict(os.environ, {"LIBPYTHON_LOC": "/x/libpython.so"}):
             os.environ.pop("PYTHONPATH", None)
             environ = run.create_environ("/some/output")

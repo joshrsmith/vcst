@@ -10,6 +10,7 @@ default a new temporary directory which is removed if all checks pass.
 
 Needs tclsh. Exits with 1 if a check fails.
 """
+
 import argparse
 import json
 import os
@@ -66,25 +67,45 @@ def run(work, flavor, bin_dir, name, *args):
     xunit = output_path / "xunit.xml"
     log = output_path / "fake.log"
     output_path.mkdir()
-    #COCOTB_TESTCASE as left by running cocotb's makefiles, which VCST must not pass on to cocotb 2.x
+    # COCOTB_TESTCASE as left by running cocotb's makefiles, which VCST must not pass on to cocotb 2.x
     env = {**simulator_env(flavor, bin_dir), "FAKE_LOG": str(log), "COCOTB_TESTCASE": "plain"}
-    proc = subprocess.run([sys.executable, str(ROOT / "project" / "run.py"), "--output-path", str(output_path),
-                           "--xunit-xml", str(xunit), *args], capture_output=True, text=True, env=env)
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "project" / "run.py"),
+            "--output-path",
+            str(output_path),
+            "--xunit-xml",
+            str(xunit),
+            *args,
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
     tests = {}
     if xunit.exists():
         for testcase in ET.parse(xunit).getroot().iter("testcase"):
             failed = any(child.tag in ("failure", "error") for child in testcase)
-            tests[f"{testcase.get('classname')}.{testcase.get('name')}"] = "failed" if failed else "passed"
+            tests[f"{testcase.get('classname')}.{testcase.get('name')}"] = (
+                "failed" if failed else "passed"
+            )
     entries = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
-    #The entries of the fake cocotb, leaving out those of the fake tools
+    # The entries of the fake cocotb, leaving out those of the fake tools
     entries = [entry for entry in entries if "load" in entry]
-    test_output = "".join(path.read_text() for path in sorted((output_path / "test_output").glob("*/output.txt")))
+    test_output = "".join(
+        path.read_text() for path in sorted((output_path / "test_output").glob("*/output.txt"))
+    )
     return proc.returncode, proc.stdout + proc.stderr, tests, entries, test_output
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Checks VCST with fake Riviera-PRO and ModelSim/Questa simulators")
-    parser.add_argument("-p", "--num-threads", type=int, default=3, help="threads of the runs with several threads")
+    parser = argparse.ArgumentParser(
+        description="Checks VCST with fake Riviera-PRO and ModelSim/Questa simulators"
+    )
+    parser.add_argument(
+        "-p", "--num-threads", type=int, default=3, help="threads of the runs with several threads"
+    )
     parser.add_argument("--output-path", type=Path, help="directory of the output of the runs")
     options = parser.parse_args()
     if shutil.which("tclsh") is None:
@@ -99,38 +120,79 @@ def main():
     for flavor in ("rivierapro", "modelsim"):
         bin_dir = create_fake_simulator(work, flavor)
 
-        listed = subprocess.run([sys.executable, str(ROOT / "project" / "run.py"), "--list", "--output-path",
-                                 str(work / f"{flavor}_list")], capture_output=True, text=True,
-                                env=simulator_env(flavor, bin_dir))
+        listed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "project" / "run.py"),
+                "--list",
+                "--output-path",
+                str(work / f"{flavor}_list"),
+            ],
+            capture_output=True,
+            text=True,
+            env=simulator_env(flavor, bin_dir),
+        )
         all_tests = {line for line in listed.stdout.splitlines() if line.startswith("lib.")}
         check(f"{flavor}: tests are listed", len(all_tests) > 2, listed.stdout + listed.stderr)
 
-        for name, args in (("persistent_one_thread", ["-p", "1"]), ("persistent", ["-p", threads]),
-                           ("unique_sim", ["-p", threads, "--unique-sim"]), ("gui", ["-g"])):
+        for name, args in (
+            ("persistent_one_thread", ["-p", "1"]),
+            ("persistent", ["-p", threads]),
+            ("unique_sim", ["-p", threads, "--unique-sim"]),
+            ("gui", ["-g"]),
+        ):
             rc, output, tests, entries, test_output = run(work, flavor, bin_dir, name, *args)
             problems = [problem for entry in entries for problem in entry["problems"]]
-            check(f"{flavor} ({name}): every test passes with what it needs", rc == 0 and set(tests) == all_tests
-                  and all(outcome == "passed" for outcome in tests.values()) and not problems,
-                  "\n".join(problems) + "\n" + output)
-            check(f"{flavor} ({name}): every test is loaded once", len(entries) == len(all_tests), output)
-            #VUnit's vunit_run reads VUnit's results file, and reports the run as failed unless the file says the
-            #test suite is done
-            check(f"{flavor} ({name}): VUnit's run script finds the test suite done",
-                  "Test Run Failed!" not in test_output and "vunit_results" not in test_output, test_output[-3000:])
+            check(
+                f"{flavor} ({name}): every test passes with what it needs",
+                rc == 0
+                and set(tests) == all_tests
+                and all(outcome == "passed" for outcome in tests.values())
+                and not problems,
+                "\n".join(problems) + "\n" + output,
+            )
+            check(
+                f"{flavor} ({name}): every test is loaded once",
+                len(entries) == len(all_tests),
+                output,
+            )
+            # VUnit's vunit_run reads VUnit's results file, and reports the run as failed unless the file says the
+            # test suite is done
+            check(
+                f"{flavor} ({name}): VUnit's run script finds the test suite done",
+                "Test Run Failed!" not in test_output and "vunit_results" not in test_output,
+                test_output[-3000:],
+            )
             if name == "gui":
-                check(f"{flavor} ({name}): the vsim_flags.gui of the user are given to vsim",
-                      entries and all("-fake_gui_flag" in entry["load"] for entry in entries), output)
+                check(
+                    f"{flavor} ({name}): the vsim_flags.gui of the user are given to vsim",
+                    entries and all("-fake_gui_flag" in entry["load"] for entry in entries),
+                    output,
+                )
             if flavor == "rivierapro":
-                #Generics of a VHDL top level are passed on as written, as VUnit does, with lists becoming aggregates.
-                #Strings given to a Verilog top level are quoted.
-                generic_args = {arg for entry in entries for arg in entry["load"] if arg.startswith("-g/")}
-                expected = {"-g/names_dut/width=16", "-g/names_dut/label=hello", "-g/names_dut/file_name=data/file.txt",
-                            '-g/names_dut/init=x"00FF"', "-g/names_dut/bit='1'", "-g/names_dut/mode=FAST",
-                            "-g/names_dut/modes=(SLOW,FAST)", "-g/names_dut/more_modes=(FAST,SLOW)",
-                            '-g/names_dut/addrs=(x"0000",X"0100",16x"ab")', '-g/verilog_dut/name="hello"',
-                            "-g/verilog_dut/count=3"}
-                check(f"{flavor} ({name}): generics are formatted for VHDL and Verilog", generic_args == expected,
-                      str(generic_args ^ expected))
+                # Generics of a VHDL top level are passed on as written, as VUnit does, with lists becoming aggregates.
+                # Strings given to a Verilog top level are quoted.
+                generic_args = {
+                    arg for entry in entries for arg in entry["load"] if arg.startswith("-g/")
+                }
+                expected = {
+                    "-g/names_dut/width=16",
+                    "-g/names_dut/label=hello",
+                    "-g/names_dut/file_name=data/file.txt",
+                    '-g/names_dut/init=x"00FF"',
+                    "-g/names_dut/bit='1'",
+                    "-g/names_dut/mode=FAST",
+                    "-g/names_dut/modes=(SLOW,FAST)",
+                    "-g/names_dut/more_modes=(FAST,SLOW)",
+                    '-g/names_dut/addrs=(x"0000",X"0100",16x"ab")',
+                    '-g/verilog_dut/name="hello"',
+                    "-g/verilog_dut/count=3",
+                }
+                check(
+                    f"{flavor} ({name}): generics are formatted for VHDL and Verilog",
+                    generic_args == expected,
+                    str(generic_args ^ expected),
+                )
 
     print("=" * 70)
     if failures:
@@ -139,7 +201,6 @@ def main():
     print("All checks passed.")
     if not options.output_path:
         shutil.rmtree(work)
-
 
 
 if __name__ == "__main__":

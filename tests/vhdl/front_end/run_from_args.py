@@ -1,13 +1,17 @@
-#Uses VUnitCLI with an argument of its own and from_args, and adds the VHDL builtins although VCST already did
-from pathlib import Path
+# Uses VUnitCLI with an argument of its own and from_args, and adds the VHDL builtins although VCST already did
 import os
+from pathlib import Path
+
 from vunit import VUnitCLI
+
 from vcst import VCST
 
 root = Path(os.path.abspath(Path(__file__).parent))
 
 cli = VUnitCLI()
-cli.parser.add_argument("--require-custom", action="store_true", help="Fail unless this option is given")
+cli.parser.add_argument(
+    "--require-custom", action="store_true", help="Fail unless this option is given"
+)
 cli.parser.add_argument("--seed-option", help="Value of the seed simulation option (VUnit 5)")
 args = cli.parse_args()
 if not args.require_custom:

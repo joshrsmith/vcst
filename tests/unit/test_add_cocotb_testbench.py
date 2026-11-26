@@ -1,6 +1,7 @@
 """
 What a user gets from add_cocotb_testbench when the cocotb module is set up wrongly: an error which names what is wrong.
 """
+
 import types
 import unittest
 from unittest import mock
@@ -28,8 +29,11 @@ class FakeLibrary:
 
 class FakeUI:
     """What add_cocotb_testbench needs of a VCST object, which otherwise needs a simulator"""
+
     def __init__(self, simulator_name=None):
-        self._simulator_class = types.SimpleNamespace(name=simulator_name) if simulator_name else None
+        self._simulator_class = (
+            types.SimpleNamespace(name=simulator_name) if simulator_name else None
+        )
         self.libraries = {}
 
     def library(self, name):
@@ -65,7 +69,9 @@ class AddCocotbTestbench(unittest.TestCase):
             with self.subTest(name=name):
                 with self.assertRaises(RuntimeError) as context:
                     add(cocotb_module(**{name: 5}))
-                self.assertIn(f"{name} defined in cocotb module should be a string", str(context.exception))
+                self.assertIn(
+                    f"{name} defined in cocotb module should be a string", str(context.exception)
+                )
 
     def test_a_top_level_type_other_than_entity_or_module_is_refused(self):
         with self.assertRaises(RuntimeError) as context:
@@ -75,13 +81,19 @@ class AddCocotbTestbench(unittest.TestCase):
         self.assertIn("module", str(context.exception))
 
     def test_an_entity_is_added_as_a_design_unit_of_its_library(self):
-        ui, result = add(cocotb_module(top_level="counter", top_level_type="entity", top_level_library="work"))
+        ui, result = add(
+            cocotb_module(top_level="counter", top_level_type="entity", top_level_library="work")
+        )
         self.assertEqual(result, "test bench")
-        self.assertEqual(ui.libraries["work"].calls,
-                         [("entity", "counter", False), ("add", "entity counter", "/path/to/my_cocotb_module")])
+        self.assertEqual(
+            ui.libraries["work"].calls,
+            [("entity", "counter", False), ("add", "entity counter", "/path/to/my_cocotb_module")],
+        )
 
     def test_a_module_is_added_as_a_design_unit_of_its_library(self):
-        ui, _ = add(cocotb_module(top_level="counter", top_level_type="module", top_level_library="work"))
+        ui, _ = add(
+            cocotb_module(top_level="counter", top_level_type="module", top_level_library="work")
+        )
         self.assertEqual(ui.libraries["work"].calls[0], ("module", "counter", False))
 
     def test_nvc_is_refused_with_a_cocotb_which_doesnt_support_it(self):

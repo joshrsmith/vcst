@@ -1,14 +1,15 @@
-#Runs cocotb tests of a Verilog top level. Needs a simulator with Verilog support, so it isn't run in CI.
-from pathlib import Path
+# Runs cocotb tests of a Verilog top level. Needs a simulator with Verilog support, so it isn't run in CI.
 import os
 import sys
+from pathlib import Path
+
 from vcst import VCST
 
 root = Path(os.path.abspath(Path(__file__).parent))
 
 ui = VCST.from_argv(compile_builtins=False)
 
-#GHDL and NVC are VHDL simulators, and VCST loads cocotb on ModelSim/Questa through FLI, which supports VHDL only
+# GHDL and NVC are VHDL simulators, and VCST loads cocotb on ModelSim/Questa through FLI, which supports VHDL only
 if ui.get_simulator_name() != "rivierapro":
     sys.exit(f"The Verilog tests need Riviera-PRO, not {ui.get_simulator_name()}")
 

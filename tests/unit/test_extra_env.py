@@ -2,6 +2,7 @@
 VUnit runs the tests in several threads, so the environment of a cocotb test can't be put in os.environ. Every process a
 thread starts while it simulates a test must have the environment of that test, and no other.
 """
+
 import os
 import sys
 import threading
