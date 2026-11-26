@@ -3,12 +3,14 @@ How VCST turns the results file cocotb writes into the outcomes of the VUnit tes
 unless it passed, so a test which ended without a failure passes, also if it skipped itself.
 """
 
+import contextlib
+import io
 import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from vunit.test.report import FAILED, PASSED
+from vunit.test.report import FAILED, PASSED, SKIPPED
 
 from vcst.test.suites import CocoTestRun
 
@@ -91,6 +93,36 @@ class ReadTestResults(unittest.TestCase):
         self.assertEqual(
             run._read_test_results("/no/such/file.xml"), {"one": FAILED, "two": FAILED}
         )
+
+
+class CheckResults(unittest.TestCase):
+    """cocotb's results stand whatever the exit status of the simulator is"""
+
+    def check(self, results, sim_ok):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            done, checked = test_run(list(results))._check_results(dict(results), sim_ok)
+        return done, checked, output.getvalue()
+
+    def test_a_passed_test_stays_passed_if_the_simulator_exits_with_a_non_zero_status(self):
+        # As a test that expects the HDL to end the simulation does, or a simulator that fails when shutting down
+        done, results, output = self.check({"test": PASSED}, sim_ok=False)
+        self.assertEqual(results, {"test": PASSED})
+        self.assertFalse(done)  # post_check still runs
+        self.assertIn("non-zero status", output)
+
+    def test_a_clean_exit_gives_no_warning(self):
+        done, results, output = self.check({"test": PASSED}, sim_ok=True)
+        self.assertEqual((done, results, output), (False, {"test": PASSED}, ""))
+
+    def test_a_failed_test_is_final_whatever_the_exit_status(self):
+        for sim_ok in (True, False):
+            done, results, _ = self.check({"failed": FAILED, "passed": PASSED}, sim_ok)
+            self.assertEqual((done, results), (True, {"failed": FAILED, "passed": PASSED}))
+
+    def test_a_skipped_test_stays_skipped(self):
+        done, results, output = self.check({"test": SKIPPED}, sim_ok=False)
+        self.assertEqual((done, results, output), (False, {"test": SKIPPED}, ""))
 
 
 if __name__ == "__main__":
