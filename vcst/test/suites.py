@@ -210,8 +210,9 @@ class CocoTestRun(TestRun):
         """
         if not sim_ok and PASSED in results.values():
             print(
-                "WARNING: the simulator exited with a non-zero status after cocotb reported the test as passed. "
-                "The test is reported as passed, as cocotb reported it."
+                "NOTE: the simulator exited with a non-zero status. cocotb reported the test as passed, so it is "
+                "reported as passed. This is expected if the test expects the simulation to end "
+                "(expect_error=SimFailure)."
             )
         return FAILED in results.values(), results
 
