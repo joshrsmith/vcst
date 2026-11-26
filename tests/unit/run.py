@@ -1,5 +1,6 @@
 """
-Runs the unit tests of VCST, which test its logic without a simulator.
+Runs the unit tests of VCST, which test its logic without a simulator. The docstring of each test module says what it
+covers. The tests which check what VCST sends to a persistent vsim need tclsh, and are skipped without it.
 
 Usage: python run.py [-p N] [--output-path DIR]
 

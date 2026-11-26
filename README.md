@@ -23,28 +23,7 @@ VCST supports VUnit 4.7.1 and VUnit 5 (pre-release, tested with 5.0.0.dev16), an
 I invite anyone who wants to help me broaden simulator support to contribute. I also intend to add support for Icarus as well. This is bigger effort as VUnit does not support Icarus (as it does not support enough of System Verilog). VUnit's SystemVerilog testbenches would not work, but cocotb testbenches could work.
 
 ## Tests
-Where a cocotb test module needs different code for cocotb 1.x and 2.x, the tests in this repository have a cocotb 1.x version (in a `cocotb1` directory) and a cocotb 2.x version (in a `cocotb2` directory) of it, and the run scripts pick the one matching the installed cocotb, see `vcst.utils.compat.COCOTB2`. A module which is the same for both is one file. Each script passes only if all of its tests have their expected outcomes:
-
-- `tests/vhdl/cocotb_examples`, `vunit_and_cocotb` and `parameterize_test`: example test benches, including VUnit and cocotb tests of the same design.
-- `tests/vhdl/test_outcomes`: tests with known outcomes, many of them failures, such as failing assertions, exceptions, tests failing to start, timeouts, `expect_fail` and `expect_error`, and tests that have names that are suffixes of other test names, are parametrized, are generated, are imported from another module or skip themselves while they run. The run script passes only if every test is reported with its expected outcome. Also covers `pre_config` and `post_check`.
-- `tests/vhdl/isolation`: tests of two top levels in several configurations run in parallel, each checking that its simulation has the environment of its own test, and the one set by the user.
-- `tests/unit`: unit tests of the logic of VCST, which need no simulator: what is sent to a persistent vsim (checked with tclsh, which the tests need), the environment of the simulation of each test in parallel runs, the selection of tests by name, the seeds, the formatting of generics for Riviera-PRO, what is given to cocotb to embed Python, the results of cocotb, importing cocotb modules by their paths, the errors of `add_cocotb_testbench` and its absolute path of a relative module location, and the refusal of a second cocotb module for a top level, but not of the same module again.
-- `tests/fake_vsim/check.py` (needs tclsh): runs tests with Riviera-PRO and ModelSim/Questa replaced by fake simulators, which run the tcl VUnit sends to the simulator with tclsh and check what the cocotb simulation gets: the cocotb library and its loading, the Python environment, the top level, the selected test and the generics, and that VUnit's run script finds the test suite done. Both when VUnit reuses the simulator process for several tests and when it doesn't, and in GUI mode with `vsim_flags.gui` set. This doesn't show that the real simulators work with cocotb, but needs neither of them.
-- `tests/vhdl/front_end/check.py`: runs run scripts with different command lines, checking `from_argv` and `from_args` with and without `compile_builtins`, rejection of unknown options, attribute selection, `--list`, `--export-json`, `--elaborate`, random seeds (`--seed`, `--seed repeat` and the `seed` simulation option), a `COCOTB_TESTCASE` set by the user, tests with the same name, cocotb modules with the same file name in different directories and a second cocotb module for a top level.
-
-`tests/verilog` has cocotb tests of a Verilog top level with an integer and a string parameter, checking that the parameters of each configuration reach the simulation. It needs Riviera-PRO, so CI doesn't run it.
-
-### Running all tests
-`tests/run_matrix.py` runs every suite with every supported combination of VUnit and cocotb, on the simulator selected by `VUNIT_SIMULATOR`, and reports which runs passed. It installs each combination in a virtual environment of its own, together with the VCST of the checkout, so all it needs is Python 3.9 or later and access to PyPI, or the package index pip is configured with. Nothing is installed in the environment it is run with. For example, with Riviera-PRO:
-
-```bash
-export VUNIT_SIMULATOR=rivierapro
-export VUNIT_RIVIERAPRO_PATH=/path/to/riviera-pro/bin
-python3 tests/run_matrix.py --quick --output /path/to/results -p 4   # 4 combinations covering each version
-python3 tests/run_matrix.py --output /path/to/results -p 4           # all combinations
-```
-
-Everything it creates is in the output directory (`matrix_out` by default) including virtual environments created during the run, console outputs and logs, and a report, `report.md`, which summarizes the results. At the end it prints one line saying whether all runs passed, and a combination which needs a newer Python than the one running the script (VUnit 5 needs Python 3.11 or later) is reported as not run. See `--help` for all options. The `unit` and `fake_vsim` suites don't use the simulator selected, but are run with every simulator. Without tclsh, `fake_vsim` is reported as skipped, which isn't a failure, and the tests of `unit` which need it are skipped. CI runs the same script, one combination per job, with GHDL and NVC.
+Where a cocotb test module needs different code for cocotb 1.x and 2.x, the tests in this repository have a cocotb 1.x version (in a `cocotb1` directory) and a cocotb 2.x version (in a `cocotb2` directory) of it, and the run scripts pick the one matching the installed cocotb, see `vcst.utils.compat.COCOTB2`. A module which is the same for both is one file. Each script passes only if all of its tests have their expected outcomes. What each suite covers, and how to run them all with every supported combination of VUnit and cocotb, is described in [tests/README.md](tests/README.md).
 
 ## Disadvantages
 There are a few disadvantages compared to use either VUnit or Cocotb by themselves. These include:

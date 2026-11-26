@@ -1,3 +1,5 @@
+# Runs cocotb tests made with parameterize_test, an alternative to cocotb's TestFactory, for an adder in two
+# configurations of its width.
 import os
 from pathlib import Path
 

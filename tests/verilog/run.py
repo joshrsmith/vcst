@@ -1,4 +1,6 @@
-# Runs cocotb tests of a Verilog top level. Needs a simulator with Verilog support, so it isn't run in CI.
+# Runs cocotb tests of a Verilog top level with an integer and a string parameter, checking that the parameters of each
+# configuration reach the simulation. Needs Riviera-PRO, as the other simulators VCST supports are VHDL only, so it
+# isn't run in CI.
 import os
 import sys
 from pathlib import Path

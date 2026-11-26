@@ -1,7 +1,11 @@
 """
 Runs the tests of project/ with Riviera-PRO and ModelSim/Questa replaced by fake simulators (tools/), checking that
 VCST, through VUnit's interfaces to these simulators, gives a cocotb simulation what it needs, both when the
-simulator process is reused for several tests (VUnit's default) and when every test has a process of its own.
+simulator process is reused for several tests (VUnit's default) and when every test has a process of its own, and in
+GUI mode with vsim_flags.gui set. The fake simulators run the tcl VUnit sends to the simulator with tclsh, and the
+checks cover what the cocotb simulation gets: the cocotb library and its loading, the Python environment, the top
+level, the selected test and the generics, and that VUnit's run script finds the test suite done. This doesn't show
+that the real simulators work with cocotb, but needs neither of them.
 
 Usage: python check.py [-p N] [--output-path DIR]
 
