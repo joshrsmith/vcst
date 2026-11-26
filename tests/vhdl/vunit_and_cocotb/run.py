@@ -1,3 +1,5 @@
+# Runs a VUnit VHDL test bench and a cocotb module for the same counter, in three configurations of its width and wrap
+# value.
 import os
 from pathlib import Path
 

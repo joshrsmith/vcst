@@ -1,5 +1,6 @@
 """
 What a user gets from add_cocotb_testbench when the cocotb module is set up wrongly: an error which names what is wrong.
+Also that a relative location of the cocotb module becomes absolute.
 """
 
 import os
