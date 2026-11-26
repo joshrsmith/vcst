@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from vcst.utils.mod_utils import import_mod
+from vcst.utils.mod_utils import import_mod, project_python_files
 
 
 class ImportMod(unittest.TestCase):
@@ -64,6 +64,27 @@ class ImportMod(unittest.TestCase):
         directory, search_path = os.getcwd(), list(sys.path)
         import_mod(str(self.directory / "dir" / "vcst_unit_mod"))
         self.assertEqual((os.getcwd(), sys.path), (directory, search_path))
+
+
+class ProjectPythonFiles(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.directory = Path(directory.name).resolve()
+        sys.path.insert(0, str(self.directory))
+        self.addCleanup(sys.path.remove, str(self.directory))
+        self.addCleanup(sys.modules.pop, "vcst_unit_project_mod", None)
+
+    def test_a_module_outside_the_libraries_is_a_file_of_the_project(self):
+        # As the files of a package installed in editable mode are, which are in the source directory of the user
+        (self.directory / "vcst_unit_project_mod.py").write_text("VALUE = 1\n")
+        __import__("vcst_unit_project_mod")
+        self.assertIn(str(self.directory / "vcst_unit_project_mod.py"), project_python_files())
+
+    def test_standard_library_modules_are_not(self):
+        import json
+
+        self.assertNotIn(os.path.realpath(json.__file__), project_python_files())
 
 
 if __name__ == "__main__":

@@ -40,6 +40,11 @@ class IndependentCocoSimTestCase(IndependentSimTestCase):
             seed=seed,
         )
 
+    @property
+    def cocotb_module_file(self):
+        """The real path of the file of the cocotb module of the test, None if it has none"""
+        return self._test.cocotb_module_file
+
     @staticmethod
     def get_name(test, config):
         """Returns the full name of the test run with the configuration"""
