@@ -1,4 +1,5 @@
 import inspect
+import os
 from collections import OrderedDict
 from dataclasses import dataclass
 
@@ -157,6 +158,12 @@ class CocoTest:
     def defining_module(self):
         """The name of the module defining the test if it was imported from another module, else None"""
         return self._defining_module
+
+    @property
+    def cocotb_module_file(self):
+        """The real path of the file of the cocotb module, None if it has none"""
+        file_name = getattr(self._cocotb_module, "__file__", None)
+        return os.path.realpath(file_name) if isinstance(file_name, str) else None
 
     @property
     def location(self):

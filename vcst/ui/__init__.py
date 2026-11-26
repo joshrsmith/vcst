@@ -4,9 +4,10 @@ from typing import Optional
 
 import cocotb
 from vunit import VUnit
+from vunit.test.list import TestList
 
 from ..utils.compat import COCOTB_SUPPORTS_NVC
-from ..utils.mod_utils import import_mod
+from ..utils.mod_utils import import_mod, project_python_files
 from .library import VCSTLibrary
 
 # VUnit 4.x adds the VHDL builtins unless compile_builtins=False, VUnit 5 only when asked to
@@ -75,6 +76,8 @@ class VCST(VUnit):
             super().__init__(args, compile_builtins=False, vhdl_standard=vhdl_standard)
         else:
             super().__init__(args, vhdl_standard=vhdl_standard)
+        # The real paths of the files of the cocotb modules added, see _get_test_list_depending_on_change
+        self._cocotb_module_files = set()
 
     def library(self, library_name: str):
         """
@@ -143,6 +146,10 @@ class VCST(VUnit):
                 f"NVC needs cocotb 1.9 or later, cocotb {cocotb.__version__} is installed"
             )
 
+        module_file = getattr(cocotb_module, "__file__", None)
+        if isinstance(module_file, str):
+            self._cocotb_module_files.add(os.path.realpath(module_file))
+
         library = self.library(top_level_library)
         top_level_design_unit = None
 
@@ -154,3 +161,45 @@ class VCST(VUnit):
         return library.add_cocotb_testbench(
             top_level_design_unit, cocotb_module, cocotb_module_location
         )
+
+    def _get_test_list_depending_on_change(self, test_list):
+        """
+        Extracts the test suites of test_list that depend on changes, for --changed (VUnit 5).
+
+        VUnit only knows the HDL files, so it takes the HDL file of the top level as the file of a cocotb test. A
+        cocotb test also depends on Python code: its own module and the rest of the Python files of the project, those
+        loaded by the run script, which are what the tests import. These are all the Python files not in the standard
+        library or site-packages (editable installs are), except for the other cocotb modules. A file that is
+        imported only while a test runs, or by a package which the run script doesn't load, isn't known.
+        """
+        depending_on_change = super()._get_test_list_depending_on_change(test_list)
+        selected = {suite.name for suite in depending_on_change}
+        shared_files = project_python_files() - self._cocotb_module_files
+
+        new_test_list = TestList()
+        for suite in test_list:
+            if suite.name in selected or self._python_changed(suite, shared_files):
+                new_test_list.add_suite(suite)
+        return new_test_list
+
+    def _python_changed(self, suite, shared_files):
+        """
+        Returns whether a Python file of the test suite was modified after its tests last ran. A suite without
+        history is not asked, as VUnit selects it.
+        """
+        # VUnit wraps each test case in a test suite of its own
+        module_file = getattr(getattr(suite, "_test_case", suite), "cocotb_module_file", None)
+        history = self._test_history.get(suite.name)
+        if module_file is None or not history:
+            return False
+        start_times = [test["start_time"] for test in history.values()]
+        if None in start_times:
+            return True
+        start_time = min(start_times)
+        for file_name in {module_file} | shared_files:
+            try:
+                if os.stat(file_name).st_mtime > start_time:
+                    return True
+            except OSError:  # Removed since it was imported
+                continue
+        return False

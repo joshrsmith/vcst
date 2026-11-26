@@ -1,6 +1,8 @@
 import inspect
 import os
+import site
 import sys
+import sysconfig
 
 
 def get_module(stack_level):
@@ -62,3 +64,36 @@ def import_mod(module_path):
         os.chdir(old_dir)
         sys.path = old_path
     return mod
+
+
+def _library_directories():
+    """The directories of the standard library and of installed packages"""
+    directories = {
+        sysconfig.get_paths().get(key) for key in ("stdlib", "platstdlib", "purelib", "platlib")
+    }
+    try:
+        directories.update(site.getsitepackages())
+        directories.add(site.getusersitepackages())
+    except AttributeError:  # site is limited in some virtual environments
+        pass
+    return [os.path.realpath(d) for d in directories if d]
+
+
+def project_python_files():
+    """
+    Returns the real paths of the files of all modules imported so far which aren't part of the standard library or
+    installed in site-packages, and aren't the main script. These are the Python files of the user's project,
+    including packages installed in editable mode, whose files are those of their source directory.
+    """
+    library_directories = _library_directories()
+    files = set()
+    for name, module in list(sys.modules.items()):
+        file_name = getattr(module, "__file__", None)
+        # multiprocessing imports the main script as __mp_main__
+        if name in ("__main__", "__mp_main__") or not isinstance(file_name, str):
+            continue
+        path = os.path.realpath(file_name)
+        if any(os.path.commonpath([path, d]) == d for d in library_directories):
+            continue
+        files.add(path)
+    return files

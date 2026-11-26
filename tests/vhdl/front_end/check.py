@@ -12,12 +12,14 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from vunit import VUnit
 from vunit.test.suites import TestRun
 
 from vcst.utils.compat import COCOTB2, COCOTB_SUPPORTS_NVC
@@ -338,6 +340,78 @@ if VUNIT_HAS_SEEDS:
     )
 else:
     print("skip --seed checks: VUnit before 5 has no --seed")
+
+# --changed (VUnit 5) selects the tests whose HDL or Python files changed since they last ran
+if hasattr(VUnit, "_get_test_list_depending_on_change"):
+    project = work / "changed_python"
+    shutil.rmtree(project, ignore_errors=True)
+    shutil.copytree(ROOT / "changed_python", project, ignore=shutil.ignore_patterns("__pycache__"))
+    changed_script = str(project / "run.py")
+    test_a, test_b = "lib.changed_a.a_test", "lib.changed_b.b_test"
+
+    def changed_selected():
+        """The tests --changed selects"""
+        _, output, _ = run("changed", changed_script, "--changed", "--list")
+        return {line for line in output.splitlines() if line.startswith("lib.")}, output
+
+    def modify(path):
+        # Modified after the tests last ran, which was at least a second ago
+        os.utime(project / path, None)
+
+    rc, output, tests = run("changed", changed_script)
+    check(
+        "changed: both tests pass in the first run",
+        rc == 0 and set(tests) == {test_a, test_b},
+        output,
+    )
+    selected, output = changed_selected()
+    check("--changed selects nothing when nothing has changed", selected == set(), output)
+
+    # As in VUnit, the run script isn't something the tests depend on
+    modify("run.py")
+    selected, output = changed_selected()
+    check("--changed selects nothing when only the run script changed", selected == set(), output)
+
+    modify("test_a.py")
+    selected, output = changed_selected()
+    check(
+        "--changed selects the tests of a cocotb module whose file changed, and no others",
+        selected == {test_a},
+        output,
+    )
+    _, output, tests = run("changed", changed_script, "--changed")
+    selected, _ = changed_selected()
+    check(
+        "--changed runs them, and then selects nothing",
+        set(tests) == {test_a} and selected == set(),
+        output,
+    )
+
+    modify("driver/regs.py")
+    selected, output = changed_selected()
+    check(
+        "--changed selects the tests of all cocotb modules when a Python file they import changed",
+        selected == {test_a, test_b},
+        output,
+    )
+    _, output, tests = run("changed", changed_script, "--changed")
+    selected, _ = changed_selected()
+    check(
+        "--changed runs them, and then selects nothing again",
+        set(tests) == {test_a, test_b} and selected == set(),
+        output,
+    )
+
+    with (project / "hdl" / "changed_duts.vhd").open("a") as hdl:
+        hdl.write("-- changed\n")
+    selected, output = changed_selected()
+    check(
+        "--changed still selects the tests of an HDL file that changed",
+        selected == {test_a, test_b},
+        output,
+    )
+else:
+    print("skip --changed checks: VUnit before 5 has no --changed")
 
 print("=" * 70)
 if failures:
