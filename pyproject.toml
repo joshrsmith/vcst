@@ -21,8 +21,9 @@ line-length = 100
 target-version = "py39"
 
 [tool.ruff.lint]
-# Errors and likely bugs (pycodestyle E4, E7 and E9, pyflakes), import sorting and bugbear
-select = ["E4", "E7", "E9", "F", "I", "B"]
+# Errors and likely bugs (pycodestyle E4, E7 and E9, pyflakes), import sorting, bugbear, newer syntax (UP),
+# simpler comprehensions (C4) and code (SIM), subprocess.run without check= and unused noqa comments
+select = ["E4", "E7", "E9", "F", "I", "B", "UP", "C4", "SIM", "PLW1510", "RUF100"]
 
 [tool.ruff.lint.per-file-ignores]
 # Tests deliberately fail or compare without using the result, to check the outcomes VCST reports

@@ -47,7 +47,12 @@ class CocotbSeed(unittest.TestCase):
         for hash_seed in ("1", "2", "random"):
             env = {**os.environ, "PYTHONHASHSEED": hash_seed}
             proc = subprocess.run(
-                [sys.executable, "-c", code], capture_output=True, text=True, env=env, timeout=120
+                [sys.executable, "-c", code],
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=120,
+                check=False,
             )
             self.assertEqual(proc.returncode, 0, proc.stderr)
             values.add(int(proc.stdout))

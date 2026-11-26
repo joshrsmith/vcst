@@ -43,7 +43,7 @@ class IndependentCocoSimTestCase(IndependentSimTestCase):
     @staticmethod
     def get_name(test, config):
         """Returns the full name of the test run with the configuration"""
-        name = "%s.%s" % (config.library_name, config.design_unit_name)
+        name = f"{config.library_name}.{config.design_unit_name}"
 
         if not config.is_default:
             name += "." + config.name
@@ -183,7 +183,7 @@ class CocoTestRun(TestRun):
 
         if self._elaborate_only:
             status = PASSED if sim_ok else FAILED
-            return dict((name, status) for name in self._test_cases)
+            return dict.fromkeys(self._test_cases, status)
 
         results = self._read_test_results(file_name=result_file_name)
 

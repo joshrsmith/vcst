@@ -67,7 +67,7 @@ def run(name, script, *args, env=None):
     ]
     run_env = {**os.environ, **(env or {})}
     run_env = {key: value for key, value in run_env.items() if value is not None}
-    proc = subprocess.run(command, capture_output=True, text=True, env=run_env)
+    proc = subprocess.run(command, capture_output=True, text=True, env=run_env, check=False)
     tests = {}
     if xunit.exists():
         for testcase in ET.parse(xunit).getroot().iter("testcase"):

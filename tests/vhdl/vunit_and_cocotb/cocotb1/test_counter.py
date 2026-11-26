@@ -10,7 +10,7 @@ from vcst.utils import set_top_level
 @vcst.test(attributes=[".reset"])
 async def reset_test(dut):
     clock = Clock(dut.clock, 4, units="ns")
-    cocotb.fork((clock.start()))
+    cocotb.fork(clock.start())
 
     await RisingEdge(dut.clock)
     dut.reset <= 1
@@ -28,7 +28,7 @@ async def reset_test(dut):
 @cocotb.test()
 async def count_test(dut):
     clock = Clock(dut.clock, 4, units="ns")
-    cocotb.fork((clock.start()))
+    cocotb.fork(clock.start())
 
     await RisingEdge(dut.clock)
     dut.reset <= 1
@@ -52,7 +52,7 @@ async def count_test(dut):
 @cocotb.test()
 async def wrap_test(dut):
     clock = Clock(dut.clock, 4, units="ns")
-    cocotb.fork((clock.start()))
+    cocotb.fork(clock.start())
 
     await RisingEdge(dut.clock)
     dut.reset <= 1

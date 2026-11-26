@@ -97,9 +97,11 @@ class AddCocotbTestbench(unittest.TestCase):
         self.assertEqual(ui.libraries["work"].calls[0], ("module", "counter", False))
 
     def test_nvc_is_refused_with_a_cocotb_which_doesnt_support_it(self):
-        with mock.patch.object(vcst.ui, "COCOTB_SUPPORTS_NVC", False):
-            with self.assertRaises(RuntimeError) as context:
-                add(cocotb_module(), FakeUI("nvc"))
+        with (
+            mock.patch.object(vcst.ui, "COCOTB_SUPPORTS_NVC", False),
+            self.assertRaises(RuntimeError) as context,
+        ):
+            add(cocotb_module(), FakeUI("nvc"))
         self.assertIn("NVC needs cocotb 1.9 or later", str(context.exception))
         with mock.patch.object(vcst.ui, "COCOTB_SUPPORTS_NVC", True):
             add(cocotb_module(), FakeUI("nvc"))

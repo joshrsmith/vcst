@@ -41,7 +41,7 @@ def set_env_var(self, env):
         process.writeline(f"set ::env({var}) $vcst_env_var")
 
 
-class ReadVarOutputConsumer(object):
+class ReadVarOutputConsumer:
     """
     Consume output from modelsim and print with indentation
     """

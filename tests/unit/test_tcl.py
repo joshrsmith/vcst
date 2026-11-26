@@ -63,6 +63,7 @@ def run_tcl(script):
             capture_output=True,
             text=True,
             timeout=60,
+            check=False,
         )
     if proc.returncode != 0:
         raise AssertionError(f"tclsh failed: {proc.stderr}\n{script[:2000]}")

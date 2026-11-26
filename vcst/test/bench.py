@@ -117,7 +117,7 @@ class CocoTestBench(TestBench):
         return test_list
 
 
-class CocoTest(object):
+class CocoTest:
     """
     TODO: Describe
     """
@@ -174,7 +174,7 @@ class CocoTest(object):
 
     @property
     def attribute_names(self):
-        return set((attr.name for attr in self._attributes))
+        return {attr.name for attr in self._attributes}
 
     def _to_tuple(self):
         return (self._name, self._location, tuple(self._attributes))

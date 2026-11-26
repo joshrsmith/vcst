@@ -13,6 +13,7 @@ The results of all runs are summarized in DIR/report.md and DIR/summary.json. Ex
 """
 
 import argparse
+import contextlib
 import itertools
 import json
 import os
@@ -209,6 +210,7 @@ def simulator_version(simulator):
             text=True,
             timeout=60,
             stdin=subprocess.DEVNULL,
+            check=False,
         )
     except (OSError, subprocess.TimeoutExpired):
         return "unknown", executable
@@ -224,6 +226,7 @@ def vcst_revision():
             capture_output=True,
             text=True,
             timeout=60,
+            check=False,
         )
     except (OSError, subprocess.TimeoutExpired):
         return "unknown"
@@ -274,7 +277,7 @@ def install(venv_dir, vunit, cocotb, vcst_source, log_path):
             log.write(f"$ {' '.join(command)}\n")
             log.flush()
             if subprocess.run(
-                command, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL
+                command, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, check=False
             ).returncode:
                 return None
     return python
@@ -317,10 +320,8 @@ def stop(proc):
             proc.wait(30)
         except (ProcessLookupError, subprocess.TimeoutExpired):
             pass
-        try:
+        with contextlib.suppress(ProcessLookupError):
             os.killpg(proc.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
     else:
         proc.kill()
     proc.wait()

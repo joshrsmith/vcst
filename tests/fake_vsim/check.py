@@ -82,6 +82,7 @@ def run(work, flavor, bin_dir, name, *args):
         capture_output=True,
         text=True,
         env=env,
+        check=False,
     )
     tests = {}
     if xunit.exists():
@@ -131,6 +132,7 @@ def main():
             capture_output=True,
             text=True,
             env=simulator_env(flavor, bin_dir),
+            check=False,
         )
         all_tests = {line for line in listed.stdout.splitlines() if line.startswith("lib.")}
         check(f"{flavor}: tests are listed", len(all_tests) > 2, listed.stdout + listed.stderr)

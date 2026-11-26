@@ -53,9 +53,8 @@ class ExtraEnv(unittest.TestCase):
             self.assertEqual(output_of_process(), "unset")
 
     def test_the_environment_ends_when_the_test_raises(self):
-        with self.assertRaises(ValueError):
-            with extra_env({"VCST_UNIT_X": "inside"}):
-                raise ValueError
+        with self.assertRaises(ValueError), extra_env({"VCST_UNIT_X": "inside"}):
+            raise ValueError
         self.assertIsNone(get_extra_env())
 
     def test_none_removes_a_variable_of_the_process(self):
