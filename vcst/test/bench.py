@@ -40,6 +40,7 @@ class CocoTestBench(TestBench):
         self.design_unit = design_unit
         self._database = database
 
+        self.cocotb_module_location = cocotb_module_location
         self._individual_tests = True
         self._configs = {}
         self._test_cases = []

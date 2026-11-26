@@ -26,9 +26,14 @@ def get_calling_module():
     return mod
 
 
+# The directory each top-level module imported by import_mod was imported from
+_IMPORTED_FROM = {}
+
+
 def import_mod(module_path):
     """Imports a module given a path to the module. Handles splitting the path off and changing
-    directories, then changing back.
+    directories, then changing back. Modules with the same name in different directories are
+    different modules.
     """
     old_dir = os.getcwd()
     old_path = list(sys.path)
@@ -37,6 +42,16 @@ def import_mod(module_path):
     if mod_dir != "":
         os.chdir(mod_dir)
         sys.path.append(os.getcwd())
+
+    # Python caches modules by name, so a module with the name of one imported from another
+    # directory would be that module. Forget it, and the modules of its package, to import this one.
+    top_name = mod_name.split(".")[0]
+    this_dir = os.getcwd()
+    if _IMPORTED_FROM.get(top_name, this_dir) != this_dir:
+        for name in list(sys.modules):
+            if name == top_name or name.startswith(f"{top_name}."):
+                del sys.modules[name]
+    _IMPORTED_FROM[top_name] = this_dir
 
     try:
         mod = __import__(mod_name)
