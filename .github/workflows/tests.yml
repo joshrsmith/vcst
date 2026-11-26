@@ -5,6 +5,17 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Called by newest-versions.yml, with the versions of VUnit and cocotb to test instead of the supported ones
+  workflow_call:
+    inputs:
+      vunit:
+        description: Space-separated versions of VUnit, empty for the supported ones
+        type: string
+        default: ""
+      cocotb:
+        description: Space-separated versions of cocotb, empty for the supported ones
+        type: string
+        default: ""
 
 # A newer push to a branch or pull request cancels the runs still going for it, but runs on main finish
 concurrency:
@@ -24,8 +35,16 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # The versions are left unquoted to become one argument each
       - id: matrix
-        run: echo "matrix=$(python3 tests/run_matrix.py --github-matrix ghdl nvc)" >> "$GITHUB_OUTPUT"
+        env:
+          VUNIT_VERSIONS: ${{ inputs.vunit }}
+          COCOTB_VERSIONS: ${{ inputs.cocotb }}
+        run: |
+          # shellcheck disable=SC2086
+          matrix=$(python3 tests/run_matrix.py --github-matrix ghdl nvc \
+            ${VUNIT_VERSIONS:+--vunit $VUNIT_VERSIONS} ${COCOTB_VERSIONS:+--cocotb $COCOTB_VERSIONS})
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   test:
     name: VUnit ${{ matrix.vunit }}, cocotb ${{ matrix.cocotb }}, ${{ matrix.simulator }}
