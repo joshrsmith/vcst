@@ -1,0 +1,5 @@
+rules:
+  # The workflows call each other as ./.github/workflows/<name>.yml, which is documented and works. zizmor would have
+  # them use a newer $/ syntax of GitHub's, which can't be tried before a workflow using it is merged
+  self-repository:
+    disable: true

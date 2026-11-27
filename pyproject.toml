@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "vcst"
-version = "0.0.11"
+dynamic = ["version"]
 description = "VUnit & cocotb smashed Together"
 readme = "README.md"
 license = "MIT"
@@ -12,6 +12,12 @@ license-files = ["LICENSE"]
 authors = [{ name = "James Price", email = "jpwice100@gmail.com" }]
 requires-python = ">=3.9"
 dependencies = ["vunit-hdl>=4.7.1,<6", "cocotb>=1.8,<3"]
+
+# The version is the latest tag, e.g. v0.1.0 is 0.1.0, and a commit after it is a development version of the next one.
+# Without git metadata, e.g. a downloaded archive of the source, it is 0.0.0 instead of a failed install.
+[tool.hatch.version]
+source = "vcs"
+raw-options = { fallback_version = "0.0.0" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["vcst"]

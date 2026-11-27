@@ -5,7 +5,8 @@ on:
   push:
     branches: [main]
   pull_request:
-  # Called by newest-versions.yml, with the versions of VUnit and cocotb to test instead of the supported ones
+  # Called by newest-versions.yml, with the versions of VUnit and cocotb to test instead of the supported ones, and by
+  # release.yml without versions
   workflow_call:
     inputs:
       vunit:
@@ -17,10 +18,11 @@ on:
         type: string
         default: ""
 
-# A newer push to a branch or pull request cancels the runs still going for it, but runs on main finish
+# A newer push to a pull request cancels the runs still going for it. The name is fixed, as github.workflow is the
+# workflow calling this one, which has other jobs in the same group.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -30,10 +32,13 @@ jobs:
   matrix:
     name: Combinations
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # The versions are left unquoted to become one argument each
       - id: matrix
@@ -50,15 +55,21 @@ jobs:
     name: VUnit ${{ matrix.vunit }}, cocotb ${{ matrix.cocotb }}, ${{ matrix.simulator }}
     needs: matrix
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.matrix.outputs.matrix) }}
     env:
+      # The versions of the simulators and the SHA-256 of what is downloaded, which the download is checked against
       GHDL_VERSION: "6.0.0"
+      GHDL_SHA256: "e0064cd3d1569e7fca27b186b0d71e80c087de90db4e466ed77dc669a574d8bc"
       NVC_VERSION: "1.23.1"
+      NVC_SHA256: "836b86c93d7ac0fa6d6313b651c0409476f04f59718fb270515e6bc6232477cd"
       VUNIT_SIMULATOR: ${{ matrix.simulator }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
@@ -70,6 +81,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libgnat-13 llvm-18 clang zlib1g-dev tcl
           curl -fsSL -o ghdl.tgz "https://github.com/ghdl/ghdl/releases/download/v${GHDL_VERSION}/ghdl-llvm-${GHDL_VERSION}-ubuntu24.04-x86_64.tar.gz"
+          echo "${GHDL_SHA256}  ghdl.tgz" | sha256sum --check
           mkdir -p "$HOME/ghdl" && tar -xzf ghdl.tgz -C "$HOME/ghdl" --strip-components=1
           echo "$HOME/ghdl/bin" >> "$GITHUB_PATH"
 
@@ -77,6 +89,7 @@ jobs:
         if: matrix.simulator == 'nvc'
         run: |
           curl -fsSL -o nvc.deb "https://github.com/nickg/nvc/releases/download/r${NVC_VERSION}/nvc_${NVC_VERSION}-1_amd64_ubuntu-24.04.deb"
+          echo "${NVC_SHA256}  nvc.deb" | sha256sum --check
           sudo apt-get update
           sudo apt-get install -y ./nvc.deb tcl
 

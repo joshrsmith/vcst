@@ -6,10 +6,10 @@ on:
     branches: [main]
   pull_request:
 
-# A newer push to a branch or pull request cancels the runs still going for it, but runs on main finish
+# A newer push to a pull request cancels the runs still going for it
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -18,11 +18,14 @@ jobs:
   ruff:
     name: Ruff
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     env:
       # Pinned, so that a new release of ruff can't fail the checks of unrelated changes. The rules are in pyproject.toml.
       RUFF_VERSION: "0.17.6"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
@@ -36,3 +39,34 @@ jobs:
 
       - name: Lint
         run: ruff check --output-format=github .
+
+  # Checks the workflows for mistakes (actionlint) and for insecure patterns (zizmor), such as actions not pinned to a
+  # commit, credentials left in the checkout, and values of events used as code
+  workflows:
+    name: Workflows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      # Pinned, like ruff, so that a new release can't fail the checks of unrelated changes
+      ACTIONLINT_VERSION: "1.7.12.25"
+      ZIZMOR_VERSION: "1.33.1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install actionlint and zizmor
+        run: pip install "actionlint-py==${ACTIONLINT_VERSION}" "zizmor==${ZIZMOR_VERSION}"
+
+      - name: Check the workflows
+        run: actionlint
+
+      # The token lets zizmor look up whether the pinned commits belong to the releases in their comments
+      - name: Audit the workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: zizmor --format=github .github

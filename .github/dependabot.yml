@@ -5,6 +5,9 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    # A release is proposed a week after it appears, so a compromised release is more likely to be pulled first
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns: ["*"]

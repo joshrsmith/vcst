@@ -1,0 +1,56 @@
+name: Build
+
+on:
+  # A branch with an open pull request is checked by pull_request only, as push would run the same jobs again
+  push:
+    branches: [main]
+  pull_request:
+  # Called by release.yml, which publishes the files built here
+  workflow_call:
+
+# A newer push to a pull request cancels the runs still going for it. The name is fixed, as github.workflow is the
+# workflow calling this one, which has other jobs in the same group.
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The version comes from the latest tag, which needs all tags and commits
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Build
+        run: |
+          pip install build twine
+          python -m build
+          twine check --strict dist/*
+
+      # Installs the wheel alone in a clean environment, to find files missing from it
+      - name: Test the wheel
+        run: |
+          python -m venv "$RUNNER_TEMP/wheel-test"
+          "$RUNNER_TEMP/wheel-test/bin/pip" install dist/*.whl
+          # Not run in the checkout, where Python would import the package from the source
+          cd "$RUNNER_TEMP"
+          wheel-test/bin/python -c "import vcst, importlib.metadata as m; print(vcst.__file__, m.version('vcst'))"
+          wheel-test/bin/pip list
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error

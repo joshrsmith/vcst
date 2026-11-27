@@ -11,10 +11,16 @@ on:
 permissions:
   contents: read
 
+# A run still going isn't cancelled by another, and only one waits
+concurrency:
+  group: newest-versions
+  cancel-in-progress: false
+
 jobs:
   versions:
     name: Newest versions
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     outputs:
       vunit: ${{ steps.versions.outputs.vunit }}
       cocotb: ${{ steps.versions.outputs.cocotb }}
@@ -43,8 +49,6 @@ jobs:
     with:
       vunit: ${{ needs.versions.outputs.vunit }}
       cocotb: ${{ needs.versions.outputs.cocotb }}
-    permissions:
-      contents: read
 
   # GitHub emails a failed scheduled run only to whoever last changed the schedule, so the owner is mentioned in an issue
   report:
@@ -52,9 +56,9 @@ jobs:
     needs: [versions, test]
     if: failure()
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     permissions:
-      contents: read
-      issues: write
+      issues: write # Opens the issue, or comments on it
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
@@ -66,7 +70,11 @@ jobs:
       - name: Open an issue, or comment on the open one
         run: |
           title="Tests fail with the newest VUnit or cocotb"
-          body="@${OWNER} The tests failed with VUnit ${VUNIT% } and cocotb ${COCOTB% }: ${RUN_URL}"
+          if [ -n "$VUNIT" ] && [ -n "$COCOTB" ]; then
+            body="@${OWNER} The tests failed with VUnit ${VUNIT% } and cocotb ${COCOTB% }: ${RUN_URL}"
+          else
+            body="@${OWNER} The run failed before the tests, while looking up the newest versions: ${RUN_URL}"
+          fi
           number=$(gh issue list --state open --search "\"$title\" in:title" --json number,title \
             --jq "map(select(.title == \"$title\"))[0].number // empty")
           if [ -n "$number" ]; then
