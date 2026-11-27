@@ -9,14 +9,22 @@ on:
 permissions:
   contents: read
 
+# Releases happen one at a time, and a release already going isn't cancelled by another tag
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   check:
     name: Check the tag
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
+      # All branches and tags, to find out whether the commit is on main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Check the tag
         env:
@@ -26,8 +34,7 @@ jobs:
             echo "::error::The tag $TAG isn't a version like v0.1.0, v0.1.0a1, v0.1.0b1 or v0.1.0rc1"
             exit 1
           fi
-          git fetch --no-tags origin main
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD; then
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
             echo "::error::The tag $TAG isn't on a commit of main"
             exit 1
           fi
@@ -46,8 +53,9 @@ jobs:
     name: GitHub release
     needs: [build, test]
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
-      contents: write
+      contents: write # Creates the release and uploads its files
     env:
       GH_TOKEN: ${{ github.token }}
       TAG: ${{ github.ref_name }}
