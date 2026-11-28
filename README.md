@@ -125,6 +125,8 @@ coverage combine
 coverage report
 ```
 
+With Riviera-PRO, coverage.py 7.3.2 and later fail to save their data on Python 3.12 and later, with or without VCST ("SystemError: <method 'setconfig' of 'sqlite3.Connection' objects> returned NULL without setting an exception"): Riviera-PRO 2026.04 loads its own SQLite, 3.25.3, into the simulator, which lacks a setting coverage.py uses. VCST works around it by removing `sqlite3.SQLITE_DBCONFIG_DEFENSIVE` in every Python that imports VCST and uses an SQLite older than 3.26, which makes coverage.py leave that setting alone; [vcst/utils/old_sqlite.py](vcst/utils/old_sqlite.py) explains why, and when it can be removed. cocotb 2.1 also reads an existing data file when the simulation starts, before VCST is imported, which still fails, so with cocotb 2.1 that file must not exist when the tests start: give each simulator a data file of its own (`parallel = True`) and erase the files of the previous run (`coverage erase`) before running the tests again.
+
 ### The Python debugger
 `COCOTB_PDB_ON_EXCEPTION` can't be used under VUnit: VUnit gives the simulator no input, so the debugger waits forever in the first test that raises an exception and the run hangs. VCST prints a warning when it is set to a value with which cocotb opens the debugger (with cocotb 2.0 and earlier, any value, even `0`). To debug a test with it, run the test with cocotb's own Makefiles or runner instead of VUnit.
 
