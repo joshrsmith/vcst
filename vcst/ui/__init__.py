@@ -12,7 +12,7 @@ try:
 except ImportError:
     TestSuiteWrapper = None
 
-from ..utils.compat import COCOTB_SUPPORTS_NVC
+from ..utils.compat import COCOTB_SUPPORTS_NVC, pdb_on_exception
 from ..utils.mod_utils import import_mod, project_python_files
 from .library import VCSTLibrary
 
@@ -96,6 +96,15 @@ class VCST(VUnit):
                 "WARNING: this version of VUnit doesn't have what VCST needs to also take Python files "
                 "into account with --changed, so it only considers HDL files, which changes nothing "
                 "for tests that only changed in Python. Run without --changed to run them all."
+            )
+        if pdb_on_exception(os.environ):
+            # VUnit starts the simulator with a pipe as its input, which nothing writes to, so the debugger that cocotb
+            # opens when a test raises an exception waits forever.
+            print(
+                f"WARNING: COCOTB_PDB_ON_EXCEPTION is set (to {os.environ['COCOTB_PDB_ON_EXCEPTION']!r}), which makes "
+                f"cocotb {cocotb.__version__} open the Python debugger in the first test that raises an exception. "
+                "Under VUnit the debugger waits forever for input, which hangs the run. Unset it, and debug the test "
+                "outside VUnit."
             )
         return super().main(*args, **kwargs)
 
