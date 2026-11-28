@@ -37,7 +37,13 @@ def flag_value(flag):
     return load_args[load_args.index(flag) + 1] if flag in load_args else None
 
 
-language = env.get("TOPLEVEL_LANG")
+# The language of the top level, from the design loaded (the project's Verilog top level is verilog_dut), rather than
+# from TOPLEVEL_LANG, which VCST sets and which is checked against it
+language = "verilog" if any("verilog_dut" in arg for arg in load_args) else "vhdl"
+check(
+    env.get("TOPLEVEL_LANG") == language,
+    f"TOPLEVEL_LANG={env.get('TOPLEVEL_LANG')!r} for a {language} top level",
+)
 if flavor == "rivierapro":
     flag = "-loadvhpi" if language == "vhdl" else "-pli"
     library = flag_value(flag)
@@ -55,7 +61,7 @@ if flavor == "rivierapro":
             )
     for access in ("+access", "+w"):
         check(access in load_args, f"{access} not given to vsim")
-else:
+elif language == "vhdl":
     foreign = flag_value("-foreign")
     check(
         foreign is not None and foreign.startswith("cocotb_init "),
@@ -63,6 +69,18 @@ else:
     )
     if foreign:
         existing_file(foreign.split(" ", 1)[1], "FLI library")
+else:
+    # FLI supports VHDL only, so a Verilog top level loads the VPI library
+    check("-foreign" not in load_args, f"-foreign (FLI) given for a Verilog top level: {load_args}")
+    library = flag_value("-pli")
+    check(library is not None, f"-pli not given to vsim: {load_args}")
+    existing_file(library and library.strip("{}"), "VPI library")
+if flavor == "modelsim":
+    # Access to the signals inside the design, which Questa's optimization would remove otherwise
+    check(
+        "-voptargs=-access=rw+/." in load_args,
+        f"-voptargs=-access=rw+/. not given to vsim: {load_args}",
+    )
 
 # The Python interpreter and library embedded by the GPI
 existing_file(env.get("PYGPI_PYTHON_BIN"), "PYGPI_PYTHON_BIN")
@@ -90,6 +108,10 @@ check(
     top_level and any(top_level.lower() in arg.lower() for arg in load_args),
     f"top level {top_level!r} is not loaded: {load_args}",
 )
+
+# ModelSim/Questa names the root of a VHDL design in lower case, and cocotb looks it up by the name it is given
+if flavor == "modelsim" and language == "vhdl":
+    check(top_level == top_level.lower(), f"top level {top_level!r} is not in lower case")
 
 # cocotb 2.x refuses to run when both are set
 if cocotb2:

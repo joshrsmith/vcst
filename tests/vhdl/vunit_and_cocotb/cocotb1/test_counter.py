@@ -76,5 +76,24 @@ async def wrap_test(dut):
     raise TestSuccess("Test passed.")
 
 
+@cocotb.test()
+async def internal_signal_test(dut):
+    """Reads a signal inside the counter, which drives no port"""
+    cocotb.start_soon(Clock(dut.clock, 4, units="ns").start())
+
+    await RisingEdge(dut.clock)
+    dut.reset.value = 1
+    dut.enable.value = 0
+    await RisingEdge(dut.clock)
+    dut.reset.value = 0
+    dut.enable.value = 1
+
+    counter_wrap = int(dut.COUNTER_WRAP.value)
+    for _ in range(counter_wrap + 3):
+        await RisingEdge(dut.clock)
+
+    assert dut.wraps.value == 1, f"The counter wrapped {int(dut.wraps.value)} times, not once"
+
+
 ########################
 set_top_level("counter", "entity", "lib")

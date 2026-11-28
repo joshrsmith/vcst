@@ -18,7 +18,16 @@ cover:
 - parametrized tests (`cocotb.parametrize` with cocotb 2.x), whose names contain `/`, `=` and `.`, and tests generated
   with `TestFactory` (cocotb 1.x)
 - tests imported from another module (`outcomes_imported.py`), which cocotb names after that module
+- a test that finishes without simulation time passing (`zero_time`), after which cocotb 2 quits ModelSim/Questa: in a
+  simulator reused by several tests (VUnit's default), VUnit then fails to read the outcome, and VCST reports the
+  outcome cocotb gives, while VUnit starts a new simulator for the next test
 - a test marked `skip=True`, which runs, as VCST selects every test by name
 
 `test_hooks.py` runs a test in configurations that give `pre_config` and `post_check` hooks: one where both pass, and
 two where one fails.
+
+`simulator_fails_after_test` can't run in a simulator that VUnit reuses on ModelSim/Questa: its simulation kernel dies
+when VUnit unloads the design (`quit -sim`) after the test, while the simulator stays and never answers, so the run
+hangs. `tests/run_matrix.py` therefore runs the suite on ModelSim/Questa twice: in reused simulators without that test
+(`--without-attributes .ends_simulator`), and with every test in a simulator of its own (`--unique-sim`). Riviera-PRO,
+GHDL and NVC run the whole suite in reused simulators.

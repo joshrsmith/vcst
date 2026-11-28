@@ -62,7 +62,26 @@ SUITES = [
     Suite("cocotb_examples", "vhdl/cocotb_examples/run.py"),
     Suite("vunit_and_cocotb", "vhdl/vunit_and_cocotb/run.py"),
     Suite("parameterize_test", "vhdl/parameterize_test/run.py"),
-    Suite("test_outcomes", "vhdl/test_outcomes/run.py"),
+    Suite(
+        "test_outcomes",
+        "vhdl/test_outcomes/run.py",
+        simulators=["ghdl", "nvc", "rivierapro"],
+    ),
+    # ModelSim/Questa never answer VUnit once a simulator it reuses has died, which simulator_fails_after_test does, so
+    # VUnit would wait forever: it is left out of the run in a reused simulator, and run with every other test in a
+    # simulator of its own, see the README of the suite
+    Suite(
+        "test_outcomes_reused_sim",
+        "vhdl/test_outcomes/run.py",
+        ["--without-attributes", ".ends_simulator"],
+        simulators=["modelsim"],
+    ),
+    Suite(
+        "test_outcomes_unique_sim",
+        "vhdl/test_outcomes/run.py",
+        ["--unique-sim"],
+        simulators=["modelsim"],
+    ),
     Suite("isolation", "vhdl/isolation/run.py"),
     Suite(
         "isolation_unique_sim",
@@ -72,8 +91,7 @@ SUITES = [
         simulators=REUSING_SIMULATORS,
     ),
     Suite("front_end", "vhdl/front_end/check.py", one_thread=False),
-    # VCST loads cocotb on ModelSim/Questa through FLI, which supports VHDL only
-    Suite("verilog", "verilog/run.py", simulators=["rivierapro"]),
+    Suite("verilog", "verilog/run.py", simulators=["rivierapro", "modelsim"]),
     # The logic of VCST, without a simulator. The tests which use tclsh are skipped without it.
     Suite("unit", "unit/run.py", one_thread=False),
     # Riviera-PRO and ModelSim/Questa replaced by fake simulators, which need tclsh

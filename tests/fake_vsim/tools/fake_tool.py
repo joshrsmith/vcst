@@ -27,7 +27,13 @@ elif tool == "vsim":
     prelude = (
         (HERE / "prelude.tcl").read_text().replace("@FAKE_COCOTB@", str(HERE / "fake_cocotb.py"))
     )
-    script = prelude + (f"source {{{do}}}\n" if os.path.isfile(do) else do + "\n")
+    # The script deletes its file first, as nothing is left to do it once tclsh replaces this process; tclsh has read
+    # the whole file by then
+    script = (
+        "file delete -- [info script]\n"
+        + prelude
+        + (f"source {{{do}}}\n" if os.path.isfile(do) else do + "\n")
+    )
     if "-c" not in args:
         # The graphical user interface, in which the user starts the simulation with vunit_run
         script += "vunit_run\n"

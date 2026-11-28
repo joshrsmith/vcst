@@ -12,6 +12,11 @@ module params_dut #(
 );
     assign sum = a + b;
 
+    // Drives no output, so that an optimizing simulator could remove it: a test reads it, to check that the signals
+    // inside a design can be read
+    logic [WIDTH-1:0] both;
+    assign both = a & b;
+
     // Which of the names given by run.py NAME is, 0 for any other name
     assign name_id = NAME == "default" ? 8'd1 :
                      NAME == "hello" ? 8'd2 :

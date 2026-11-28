@@ -18,7 +18,11 @@ VCST supports VUnit 4.7.1 and VUnit 5 (pre-release), and cocotb 1.8, 1.9, 2.0 an
 | GHDL            | Tested in CI          | GHDL's VPI support is limited, so cocotb can't use everything with it  |
 | NVC             | Tested in CI          | Needs cocotb 1.9 or later                                              |
 | Riviera-PRO     | Tested by hand        | Full `tests/run_matrix.py` run with Riviera-PRO 2026.04, all passed    |
-| ModelSim/Questa | Supported, not tested | Not run with the current versions of VUnit and cocotb; reports welcome |
+| ModelSim/Questa | Tested by hand        | Full `tests/run_matrix.py` run with Questa Altera Starter FPGA Edition 2025.2 on Linux, all passed |
+
+**ModelSim/Questa** was tested with that edition and version on Linux only; reports about others, and about Windows, are welcome. Known issues:
+* With cocotb 2, Questa crashes if it quits before a test ran ([cocotb#5777](https://github.com/cocotb/cocotb/issues/5777)), so VCST doesn't load cocotb for `--elaborate`, with any version of cocotb: `--elaborate` doesn't check that cocotb loads.
+* If the simulation kernel of a simulator that VUnit reuses for several tests (its default) dies, for example because of a crash in a library loaded into it, Questa doesn't answer VUnit any more and the run hangs instead of reporting a failure. If a run stops making progress, run it with `--unique-sim`, which starts a simulator for every test, and look at the output of the test that was running.
 
 I invite anyone who wants to help me broaden simulator support to contribute. I also intend to add support for Icarus as well. This is bigger effort as VUnit does not support Icarus (as it does not support enough of System Verilog). VUnit's SystemVerilog testbenches would not work, but cocotb testbenches could work.
 
@@ -112,7 +116,9 @@ Other behaviors:
 * Tests decorated with `@vcst.test(attributes=[".my_attribute"])` instead of `@cocotb.test()` get VUnit attributes, which can be used to select tests with the `--with-attributes` and `--without-attributes` options.
 * With VUnit 5, the seed VUnit gives a test is also the cocotb random seed, so `--seed` and `--seed repeat` work for cocotb tests as for VUnit tests. A seed set with `COCOTB_RANDOM_SEED` (`RANDOM_SEED` with cocotb 1.x) takes precedence.
 * With Riviera-PRO, a generic with a value of a list or tuple becomes an aggregate, e.g. `["FOO", "BAR"]` in python becomes `(FOO,BAR)` when passed to the simulator. Generics of a VHDL top level are otherwise passed to the simulator as written, as done with VUnit, so they are written as VHDL: `"FOO"` for an enumeration literal, `'x"00FF"'`, `"(FOO,BAR)"`, and quotes are only added to values containing spaces.
-* Strings given to a Verilog top level are quoted, as Riviera-PRO needs for string parameters.
+* The design is loaded with access to the signals inside it, so that cocotb can read them, and they can be seen in the GUI: with read and write access to all of it on ModelSim/Questa (`-voptargs=-access=rw+/.`), as cocotb's runner does, and with `+access +w -O2` on Riviera-PRO. This limits how much the simulator optimizes the design, which can make large designs simulate slower.
+* With Riviera-PRO, strings given to a Verilog top level are quoted, as it needs for string parameters.
+* With cocotb 2, a test that ends before any simulation time passed makes cocotb quit ModelSim/Questa. VCST reports the outcome cocotb gives, and VUnit starts a new simulator for the next test.
 
 ## Testing
 
