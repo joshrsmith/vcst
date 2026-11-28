@@ -9,7 +9,8 @@ Every combination is installed in a virtual environment of its own, DIR/venvs/<c
 running this script: the versions of VUnit and cocotb, from PyPI or the index pip is configured with, and the VCST of
 this checkout. The virtual environments are kept for later runs with the same DIR, VCST being reinstalled each time.
 Each run of a suite writes its VUnit output and its console output (console.log) to DIR/<combination>/<suite>-p<N>.
-The results of all runs are summarized in DIR/report.md and DIR/summary.json. Exits with 1 if a run failed.
+The results of all runs are summarized in DIR/report.md and DIR/summary.json. Exits with 1 if a run failed. A suite that
+can't run here, e.g. for lack of a display, exits with 77 and a line "Skipped: <reason>", and is reported as skipped.
 """
 
 import argparse
@@ -36,6 +37,9 @@ COCOTB_VERSIONS = ["1.8.1", "1.9.2", "2.0.1", "2.1.0"]
 # Fewer combinations, run with --quick, still covering each version. cocotb versions differ in how cocotb is loaded
 # into the simulator.
 QUICK = [("4.7.1", "1.8.1"), ("5.0.0.dev16", "1.9.2"), ("4.7.1", "2.0.1"), ("5.0.0.dev16", "2.1.0")]
+
+# The exit code of a suite that can't run here, e.g. for lack of a display, which is not a failure (as in automake)
+SKIPPED_EXIT_CODE = 77
 
 # Simulators running all tests of a thread in one simulator process, unless --unique-sim is given
 REUSING_SIMULATORS = ["rivierapro", "modelsim"]
@@ -74,6 +78,8 @@ SUITES = [
     Suite("front_end", "vhdl/front_end/check.py", one_thread=False),
     # VCST loads cocotb on ModelSim/Questa through FLI, which supports VHDL only
     Suite("verilog", "verilog/run.py", simulators=["rivierapro"]),
+    # The GUI of ModelSim/Questa and Riviera-PRO, which needs an X server: skipped without one, see its docstring
+    Suite("gui", "gui/check.py", one_thread=False, simulators=["modelsim", "rivierapro"]),
     # The logic of VCST, without a simulator. The tests which use tclsh are skipped without it.
     Suite("unit", "unit/run.py", one_thread=False),
     # Riviera-PRO and ModelSim/Questa replaced by fake simulators, which need tclsh
@@ -284,7 +290,10 @@ def install(venv_dir, vunit, cocotb, vcst_source, log_path):
 
 
 def run(command, log_path, cwd, env, timeout):
-    """Runs a command with its output written to log_path, returns "pass", "FAIL" or "TIMEOUT" """
+    """
+    Runs a command with its output written to log_path, returns "pass", "FAIL", "TIMEOUT", or "skip" if it exits with
+    SKIPPED_EXIT_CODE, in which case the last line of its output starting with "Skipped: " is the reason.
+    """
     with open(log_path, "w") as log:
         log.write(f"$ {' '.join(command)}\n")
         log.flush()
@@ -299,7 +308,8 @@ def run(command, log_path, cwd, env, timeout):
             start_new_session=True,
         )
         try:
-            return "pass" if proc.wait(timeout) == 0 else "FAIL"
+            code = proc.wait(timeout)
+            return "pass" if code == 0 else "skip" if code == SKIPPED_EXIT_CODE else "FAIL"
         except subprocess.TimeoutExpired:
             stop(proc)
             log.write(f"\nStopped after {timeout:g} seconds\n")
@@ -307,6 +317,16 @@ def run(command, log_path, cwd, env, timeout):
         except KeyboardInterrupt:
             stop(proc)
             raise
+
+
+def skipped_reason(log_path):
+    """The reason a suite gave for being skipped, the text after the last "Skipped: " in its output"""
+    reasons = [
+        line.partition("Skipped: ")[2]
+        for line in Path(log_path).read_text(errors="replace").splitlines()
+        if line.startswith("Skipped: ")
+    ]
+    return reasons[-1] if reasons else "the suite said it can't run here"
 
 
 def stop(proc):
@@ -524,15 +544,18 @@ def main():
                 # the VCST installed
                 result = run(command, log, run_dir, env, options.timeout)
                 seconds = time.monotonic() - start
-                combination["runs"].append(
-                    {
-                        "name": run_name,
-                        "result": result,
-                        "seconds": round(seconds, 1),
-                        "log": str(log),
-                    }
-                )
-                print(f"  {run_name:<26} {result:<8} {duration(seconds)}")
+                entry = {
+                    "name": run_name,
+                    "result": result,
+                    "seconds": round(seconds, 1),
+                    "log": str(log),
+                }
+                if result == "skip":
+                    entry["reason"] = skipped_reason(log)
+                    print(f"  {run_name:<26} skip     {entry['reason']}")
+                else:
+                    print(f"  {run_name:<26} {result:<8} {duration(seconds)}")
+                combination["runs"].append(entry)
     except KeyboardInterrupt:
         print("\nInterrupted, reporting the runs so far")
         summary["interrupted"] = True

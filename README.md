@@ -20,6 +20,8 @@ VCST supports VUnit 4.7.1 and VUnit 5 (pre-release), and cocotb 1.8, 1.9, 2.0 an
 | Riviera-PRO     | Tested by hand        | Full `tests/run_matrix.py` run with Riviera-PRO 2026.04, all passed    |
 | ModelSim/Questa | Supported, not tested | Not run with the current versions of VUnit and cocotb; reports welcome |
 
+The GUI (`--gui`) of ModelSim/Questa and Riviera-PRO is tested by hand too. After `vunit_restart` in the GUI, Riviera-PRO runs the cocotb test again; ModelSim/Questa doesn't with cocotb 2, and with cocotb 1.x it doesn't either or the GUI hangs ([cocotb#284](https://github.com/cocotb/cocotb/issues/284)), so close the GUI and run the test again instead.
+
 I invite anyone who wants to help me broaden simulator support to contribute. I also intend to add support for Icarus as well. This is bigger effort as VUnit does not support Icarus (as it does not support enough of System Verilog). VUnit's SystemVerilog testbenches would not work, but cocotb testbenches could work.
 
 ## Disadvantages
