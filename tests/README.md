@@ -39,3 +39,9 @@ later) is reported as not run. See `--help` for all options.
 The `unit` and `fake_vsim` suites don't use the simulator selected, but are run with every simulator. Without `tclsh`,
 `fake_vsim` is reported as skipped, which isn't a failure, and the tests of `unit` which need it are skipped. CI runs
 the same script, one combination per job, with GHDL and NVC.
+
+With Riviera-PRO, `unit` also checks VCST's workaround for the old SQLite Riviera-PRO loads into the simulator, without
+running the simulator (`unit/test_old_sqlite.py`). It needs a Python that links SQLite dynamically, as most do (uv's
+Pythons have it built in), and coverage.py, which it installs from the package index if it isn't installed; otherwise
+it is skipped, saying why. CI checks the same with SQLite 3.25.3 built from source, and every week with the newest
+coverage.py.

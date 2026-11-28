@@ -1,6 +1,10 @@
 import cocotb
 
 from .mod_utils import get_calling_module
+from .old_sqlite import hide_defensive_config
+
+# So that coverage.py can save its data with the old SQLite Riviera-PRO loads into the simulator, see old_sqlite.py
+hide_defensive_config()
 
 
 def set_top_level(top_level, top_level_type, top_level_library):

@@ -1,7 +1,8 @@
 name: Newest versions
 
 # Runs the tests with the newest release and the newest prerelease of VUnit and of cocotb on PyPI, which can be newer than
-# the versions VCST supports, so that a change in either that breaks VCST is found before a user finds it.
+# the versions VCST supports, so that a change in either that breaks VCST is found before a user finds it, and the check
+# of the old SQLite workaround with the newest coverage.py (see the old-sqlite job of tests.yml).
 # A failed run opens an issue mentioning the repository owner, or comments on the one still open.
 on:
   schedule:
@@ -49,6 +50,7 @@ jobs:
     with:
       vunit: ${{ needs.versions.outputs.vunit }}
       cocotb: ${{ needs.versions.outputs.cocotb }}
+      newest-coverage: true
 
   # GitHub emails a failed scheduled run only to whoever last changed the schedule, so the owner is mentioned in an issue
   report:
@@ -71,7 +73,7 @@ jobs:
         run: |
           title="Tests fail with the newest VUnit or cocotb"
           if [ -n "$VUNIT" ] && [ -n "$COCOTB" ]; then
-            body="@${OWNER} The tests failed with VUnit ${VUNIT% } and cocotb ${COCOTB% }: ${RUN_URL}"
+            body="@${OWNER} The tests failed with VUnit ${VUNIT% } and cocotb ${COCOTB% } (and the newest coverage.py for the old SQLite check): ${RUN_URL}"
           else
             body="@${OWNER} The run failed before the tests, while looking up the newest versions: ${RUN_URL}"
           fi
