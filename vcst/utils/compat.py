@@ -114,6 +114,21 @@ def seed_variable():
     return "COCOTB_RANDOM_SEED" if COCOTB2 else "RANDOM_SEED"
 
 
+def pdb_on_exception(environ):
+    """
+    Returns whether cocotb will open the Python debugger when a test raises an exception, from COCOTB_PDB_ON_EXCEPTION
+    in environ, as the cocotb installed reads it: cocotb 2.1 as a boolean, where an empty value, 0, no, n, off, false
+    and disable mean no (cocotb_tools._env.get_bool, and it refuses other values than these and their yes counterparts),
+    earlier versions whenever it is set, whatever its value.
+    """
+    if "COCOTB_PDB_ON_EXCEPTION" not in environ:
+        return False
+    if COCOTB_VERSION < (2, 1):
+        return True
+    value = environ["COCOTB_PDB_ON_EXCEPTION"].strip().lower()
+    return value not in ("", "0", "no", "n", "off", "false", "disable")
+
+
 def gpi_environ(environ):
     """
     Returns the environment variables needed by the GPI to embed the Python interpreter running VCST.
