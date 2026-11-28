@@ -15,7 +15,7 @@ Where to find what each suite covers:
 | `vhdl/front_end/check.py` | The command line and run script interface, which differs between VUnit 4.7 and 5 | its docstring |
 | `unit` | The logic of VCST, without a simulator | the docstring of each test module, and of `run.py` |
 | `fake_vsim/check.py` | The Riviera-PRO and ModelSim/Questa support, with fake simulators run by `tclsh` | its docstring |
-| `verilog` | A Verilog top level; needs Riviera-PRO, so CI doesn't run it | the header of its `run.py` |
+| `verilog` | A Verilog top level; needs Riviera-PRO or ModelSim/Questa, so CI doesn't run it | the header of its `run.py` |
 
 ## Running all tests
 

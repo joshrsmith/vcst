@@ -30,4 +30,4 @@ def make_test(name):
 for _name in NAMES:
     globals()[f"test_{NAMES.index(_name)}"] = make_test(_name)
 
-set_top_level("names_dut", "entity", "lib")
+set_top_level("NAMES_DUT", "entity", "lib")

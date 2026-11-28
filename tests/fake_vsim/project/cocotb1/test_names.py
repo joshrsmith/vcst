@@ -21,4 +21,4 @@ factory = TestFactory(generated)
 factory.add_option("value", [1, 2])
 factory.generate_tests()
 
-set_top_level("names_dut", "entity", "lib")
+set_top_level("NAMES_DUT", "entity", "lib")

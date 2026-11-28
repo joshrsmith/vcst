@@ -32,4 +32,16 @@ async def adding(dut):
         assert int(dut.sum.value) == a + b, f"{a} + {b} gave {int(dut.sum.value)}"
 
 
+@cocotb.test()
+async def internal_signal(dut):
+    """Reads a signal inside the design, which drives no output"""
+    width = len(dut.a)
+    a = random.randint(0, 2**width - 1)
+    b = random.randint(0, 2**width - 1)
+    dut.a.value = a
+    dut.b.value = b
+    await Timer(1, "ns")
+    assert int(dut.both.value) == a & b, f"{a} & {b} gave {int(dut.both.value)}"
+
+
 set_top_level("params_dut", "module", "lib")
