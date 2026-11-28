@@ -17,6 +17,10 @@ on:
         description: Space-separated versions of cocotb, empty for the supported ones
         type: string
         default: ""
+      newest-coverage:
+        description: Check the old SQLite workaround with the newest coverage.py instead of the one pinned below
+        type: boolean
+        default: false
 
 # A newer push to a pull request cancels the runs still going for it. The name is fixed, as github.workflow is the
 # workflow calling this one, which has other jobs in the same group.
@@ -99,3 +103,44 @@ jobs:
           VUNIT_VERSION: ${{ matrix.vunit }}
           COCOTB_VERSION: ${{ matrix.cocotb }}
         run: python tests/run_matrix.py --vunit "$VUNIT_VERSION" --cocotb "$COCOTB_VERSION" --output "$HOME/matrix" --show-logs
+
+  # The workaround letting coverage.py save its data with the old SQLite which Riviera-PRO loads into the simulator
+  # (vcst/utils/old_sqlite.py), checked without Riviera-PRO: SQLite 3.25.3, the version of Riviera-PRO 2026.04, is
+  # built from source and loaded into Python. Pull requests use the coverage.py pinned here, so that a new coverage.py
+  # doesn't fail unrelated changes; newest-versions.yml runs it every week with the newest coverage.py, so that one which
+  # no longer works with that SQLite, despite the workaround, or which no longer needs it, is noticed.
+  old-sqlite:
+    name: Old SQLite, Python ${{ matrix.python }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # The oldest Python whose sqlite3 has SQLITE_DBCONFIG_DEFENSIVE, and the newest that cocotb supports (cocotb
+        # refuses to install on a newer one)
+        python: ["3.12", "3.14"]
+    env:
+      COVERAGE: ${{ inputs.newest-coverage && 'coverage' || 'coverage==7.17.5' }}
+      SQLITE_SOURCE: sqlite-amalgamation-3250300
+      SQLITE_SHA256: "2ad5379f3b665b60599492cc8a13ac480ea6d819f91b1ef32ed0e1ad152fafef"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Build SQLite 3.25.3
+        run: |
+          curl -fsSL -o sqlite.zip "https://www.sqlite.org/2018/${SQLITE_SOURCE}.zip"
+          echo "${SQLITE_SHA256}  sqlite.zip" | sha256sum --check
+          unzip -q sqlite.zip
+          gcc -shared -fPIC -O2 -w -o "$HOME/libsqlite3.so.0" "${SQLITE_SOURCE}/sqlite3.c" -lpthread -ldl -lm
+
+      # With VCST_OLD_SQLITE set, the test fails instead of being skipped if it can't use that SQLite
+      - name: Check the workaround
+        run: |
+          python -m pip install . "$COVERAGE"
+          VCST_OLD_SQLITE="$HOME/libsqlite3.so.0" python -m unittest discover -v -s tests/unit -p test_old_sqlite.py
