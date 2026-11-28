@@ -16,6 +16,9 @@ port (
 end entity counter;
 
 architecture rtl of counter is
+    -- The times the counter wrapped, which drives no port, so that an optimizing simulator could remove it: the cocotb
+    -- tests read it, to check that the signals inside a design can be read
+    signal wraps : natural := 0;
 begin
     
     counter_proc: process(clock)
@@ -25,11 +28,13 @@ begin
                 counter_value <= counter_value+1;
                 if counter_value = COUNTER_WRAP then
                     counter_value <= (others => '0');
+                    wraps <= wraps + 1;
                 end if;
             end if;
 
             if reset then
                 counter_value <= (others => '0');
+                wraps <= 0;
             end if;
         end if;
     end process counter_proc;

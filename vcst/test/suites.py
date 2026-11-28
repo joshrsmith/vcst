@@ -1,6 +1,8 @@
 import hashlib
 import os
 import re
+import sys
+import traceback
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -109,11 +111,18 @@ class CocoTestRun(TestRun):
         environ["COCOTB_RESULTS_FILE"] = get_result_file_name(output_path)
         environ["TOPLEVEL_LANG"] = "vhdl" if self._vhdl else "verilog"
 
-        if self._simulator_if.name in ("ghdl", "nvc"):
+        # As done by cocotb's runners for these simulators. Ignored by cocotb 1.x.
+        if (
+            self._simulator_if.name in ("ghdl", "nvc")
+            and "COCOTB_TRUST_INERTIAL_WRITES" not in os.environ
+        ):
+            environ["COCOTB_TRUST_INERTIAL_WRITES"] = "1"
+
+        # These simulators name the root of a VHDL design in lower case, whatever the case of the entity name
+        if self._simulator_if.name in ("ghdl", "nvc") or (
+            self._simulator_if.name == "modelsim" and self._vhdl
+        ):
             top_level = self._top_level.lower()
-            # As done by cocotb's runners for these simulators. Ignored by cocotb 1.x.
-            if "COCOTB_TRUST_INERTIAL_WRITES" not in os.environ:
-                environ["COCOTB_TRUST_INERTIAL_WRITES"] = "1"
         else:
             top_level = self._top_level
 
@@ -138,10 +147,19 @@ class CocoTestRun(TestRun):
         if self._simulator_if.name == "nvc":
             append_sim_options(config, "nvc.sim_flags", [f"--load={gpi_lib('vhpi', 'nvc')}"])
 
-        if self._simulator_if.name == "modelsim":
-            append_vsim_flags(
-                config, "modelsim", [f'-foreign "cocotb_init {gpi_lib("fli", "questa")}"']
-            )
+        if self._simulator_if.name == "modelsim" and not self._elaborate_only:
+            # cocotb isn't loaded to only elaborate: cocotb 2's FLI library crashes Questa when it quits before a
+            # test ran (cocotb issue 5777), and nothing needs cocotb then.
+            # Read and write access to the whole design, as cocotb's runner gives: without it Questa's optimization
+            # removes signals that drive no port, which cocotb then can't find, as Riviera-PRO's +access does below.
+            append_vsim_flags(config, "modelsim", ["-voptargs=-access=rw+/."])
+            if self._vhdl:
+                append_vsim_flags(
+                    config, "modelsim", [f'-foreign "cocotb_init {gpi_lib("fli", "questa")}"']
+                )
+            else:
+                # FLI supports VHDL only. VUnit quotes the libraries of its pli option for Tcl.
+                append_sim_options(config, "pli", [gpi_lib("vpi", "questa")])
 
         if self._simulator_if.name == "rivierapro":
             append_vsim_flags(config, "rivierapro", ["+access", "+w", "-interceptcoutput", "-O2"])
@@ -210,7 +228,7 @@ class CocoTestRun(TestRun):
         The results are those cocotb reported. Unlike VUnit, which fails a test that passed if the simulator exits
         with a non-zero status, a test cocotb reported as passed stays passed: a test that expects the HDL to end
         the simulation (expect_error=SimFailure) leaves the simulator with a non-zero status, and so does a
-        simulator that fails after cocotb wrote its results. If cocotb reported nothing, the tests have failed
+        simulator that fails after cocotb wrote its results, or one that quits while VUnit reuses it. If cocotb reported nothing, the tests have failed
         already, as no results file means they did.
         """
         if not sim_ok and PASSED in results.values():
@@ -230,12 +248,24 @@ class CocoTestRun(TestRun):
         env = self.create_environ(output_path, seed)
         self.configure_simulator(config, env)
         with extra_env(env):
-            return self._simulator_if.simulate(
-                output_path=output_path,
-                test_suite_name=self._test_suite_name,
-                config=config,
-                elaborate_only=self._elaborate_only,
-            )
+            try:
+                return self._simulator_if.simulate(
+                    output_path=output_path,
+                    test_suite_name=self._test_suite_name,
+                    config=config,
+                    elaborate_only=self._elaborate_only,
+                )
+            except Exception:
+                # VUnit failed while running the simulation, e.g. as the ModelSim/Questa it reuses for several tests quit:
+                # cocotb 2 quits it when a test ends before simulation time passed (FliImpl::sim_end calls mti_Quit at
+                # time 0), and VUnit then fails to read the outcome from it. The outcome is the one cocotb wrote, as for
+                # a simulator that exits with a non-zero status (_check_results), and VUnit starts a new simulator for
+                # the next test.
+                print(
+                    "NOTE: VUnit failed while running the simulation, the outcome is the one cocotb reported:"
+                )
+                traceback.print_exc(file=sys.stdout)
+                return False
 
     def _read_test_results(self, file_name):
         results = {}

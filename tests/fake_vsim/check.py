@@ -1,11 +1,12 @@
 """
 Runs the tests of project/ with Riviera-PRO and ModelSim/Questa replaced by fake simulators (tools/), checking that
-VCST, through VUnit's interfaces to these simulators, gives a cocotb simulation what it needs, both when the
-simulator process is reused for several tests (VUnit's default) and when every test has a process of its own, and in
-GUI mode with vsim_flags.gui set. The fake simulators run the tcl VUnit sends to the simulator with tclsh, and the
-checks cover what the cocotb simulation gets: the cocotb library and its loading, the Python environment, the top
-level, the selected test and the generics, and that VUnit's run script finds the test suite done. This doesn't show
-that the real simulators work with cocotb, but needs neither of them.
+VCST, through VUnit's interfaces to these simulators, gives a cocotb simulation what it needs, both when the simulator
+process is reused for several tests (VUnit's default) and when every test has a process of its own, and in GUI mode with
+vsim_flags.gui set, and that ModelSim/Questa elaborates without the cocotb library (--elaborate). The fake simulators
+run the tcl VUnit sends to the simulator with tclsh, and the checks cover what the cocotb simulation gets: the cocotb
+library and its loading, the Python environment, the top level, the selected test and the generics, and that VUnit's run
+script finds the test suite done. This doesn't show that the real simulators work with cocotb, but needs neither of
+them.
 
 Usage: python check.py [-p N] [--output-path DIR]
 
@@ -199,6 +200,24 @@ def main():
                     generic_args == expected,
                     str(generic_args ^ expected),
                 )
+
+        if flavor == "modelsim":
+            # cocotb isn't loaded to only elaborate on ModelSim/Questa, as cocotb 2's FLI library crashes Questa when it
+            # quits before a test ran
+            rc, output, tests, _, test_output = run(
+                work, flavor, bin_dir, "elaborate", "--elaborate"
+            )
+            loads = [
+                line for line in test_output.splitlines() if line.startswith("FAKE_VSIM_LOAD ")
+            ]
+            check(
+                f"{flavor} (elaborate): every design is elaborated, without the cocotb library",
+                rc == 0
+                and set(tests) == all_tests
+                and len(loads) == len(all_tests)
+                and not any("-foreign" in load or "-pli" in load for load in loads),
+                "\n".join(loads) + "\n" + output,
+            )
 
     print("=" * 70)
     if failures:

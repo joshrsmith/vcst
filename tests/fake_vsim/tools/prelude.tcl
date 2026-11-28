@@ -5,6 +5,8 @@ set fake_load_args {}
 proc vsim {args} {
     global fake_load_args
     set fake_load_args $args
+    # For the checks of a design loaded without running it (--elaborate)
+    puts "FAKE_VSIM_LOAD $args"
 }
 
 proc run {args} {

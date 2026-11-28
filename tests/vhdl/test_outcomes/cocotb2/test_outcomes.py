@@ -7,6 +7,7 @@ import cocotb
 from cocotb.regression import SimFailure
 from cocotb.triggers import Timer
 
+import vcst
 from vcst.utils import set_top_level
 
 # The names of the tests run in this simulation. VCST runs each test in a simulation of its own, which run_alone
@@ -103,8 +104,10 @@ async def expect_sim_failure_not_ended(dut):
     await run_alone("expect_sim_failure_not_ended")
 
 
-# The simulator exits with a non-zero status when it shuts down, after cocotb wrote its results. The test passed.
-@cocotb.test()
+# The simulator exits with a non-zero status when it shuts down, after cocotb wrote its results. The test passed. A
+# ModelSim/Questa that VUnit reuses then never answers VUnit, so this test is left out of runs in a reused simulator
+# there, by its attribute.
+@vcst.test(attributes=[".ends_simulator"])
 async def simulator_fails_after_test(dut):
     await run_alone("simulator_fails_after_test")
     atexit.register(lambda: os._exit(3))
@@ -114,6 +117,14 @@ async def simulator_fails_after_test(dut):
 async def timing_out(dut):
     await run_alone("timing_out")
     await Timer(100, unit="ns")
+
+
+# Finishes without simulation time passing. cocotb 2 then quits ModelSim/Questa, which VUnit doesn't expect from a
+# simulator it reuses; VCST reports the outcome cocotb gives, see the README of this suite.
+@cocotb.test()
+async def zero_time(dut):
+    _tests_run.append("zero_time")
+    assert _tests_run == ["zero_time"], f"zero_time ran in the same simulation as {_tests_run[:-1]}"
 
 
 # cocotb runs a test selected by name even if it is marked skip, as VCST selects every test by name
@@ -134,6 +145,7 @@ expect(
     "passed",
     "passing",
     "ing",
+    "zero_time",
     "expect_fail_failing",
     "expect_error_raised",
     "expect_sim_failure_ended",
