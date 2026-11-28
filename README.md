@@ -24,6 +24,8 @@ VCST supports VUnit 4.7.1 and VUnit 5 (pre-release), and cocotb 1.8, 1.9, 2.0 an
 * With cocotb 2, Questa crashes if it quits before a test ran ([cocotb#5777](https://github.com/cocotb/cocotb/issues/5777)), so VCST doesn't load cocotb for `--elaborate`, with any version of cocotb: `--elaborate` doesn't check that cocotb loads.
 * If the simulation kernel of a simulator that VUnit reuses for several tests (its default) dies, for example because of a crash in a library loaded into it, Questa doesn't answer VUnit any more and the run hangs instead of reporting a failure. If a run stops making progress, run it with `--unique-sim`, which starts a simulator for every test, and look at the output of the test that was running.
 
+The GUI (`--gui`) of ModelSim/Questa and Riviera-PRO is tested by hand too. After `vunit_restart` in the GUI, Riviera-PRO runs the cocotb test again; ModelSim/Questa doesn't with cocotb 2, and with cocotb 1.x it doesn't either or the GUI hangs ([cocotb#284](https://github.com/cocotb/cocotb/issues/284)), so close the GUI and run the test again instead.
+
 I invite anyone who wants to help me broaden simulator support to contribute. I also intend to add support for Icarus as well. This is bigger effort as VUnit does not support Icarus (as it does not support enough of System Verilog). VUnit's SystemVerilog testbenches would not work, but cocotb testbenches could work.
 
 ## Disadvantages

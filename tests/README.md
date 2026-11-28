@@ -1,9 +1,10 @@
 # Tests of VCST
 
-Every suite is a run script or a check script that exits with 1 unless all its tests have their expected outcomes. The
-suites that run a simulator use the one selected by `VUNIT_SIMULATOR`, like VUnit. Where a cocotb test module needs
-different code for cocotb 1.x and 2.x, the suite has a `cocotb1` and a `cocotb2` directory, and its run script picks the
-one matching the installed cocotb, see the top-level [README](../README.md#testing).
+Every suite is a run script or a check script that exits with 1 unless all its tests have their expected outcomes, or
+with 77, after a line starting with `Skipped: ` and the reason, if it can't run here. The suites that run a simulator
+use the one selected by `VUNIT_SIMULATOR`, like VUnit. Where a cocotb test module needs different code for cocotb 1.x
+and 2.x, the suite has a `cocotb1` and a `cocotb2` directory, and its run script picks the one matching the installed
+cocotb, see the top-level [README](../README.md#testing).
 
 Where to find what each suite covers:
 
@@ -15,6 +16,7 @@ Where to find what each suite covers:
 | `vhdl/front_end/check.py` | The command line and run script interface, which differs between VUnit 4.7 and 5, and settings VCST ignores or warns about | its docstring |
 | `unit` | The logic of VCST, without a simulator | the docstring of each test module, and of `run.py` |
 | `fake_vsim/check.py` | The Riviera-PRO and ModelSim/Questa support, with fake simulators run by `tclsh` | its docstring |
+| `gui` | A cocotb test in the GUI (`--gui`) of ModelSim/Questa and Riviera-PRO, also with `vsim_flags.gui` and after `vunit_restart`; needs an X server, so CI doesn't run it | the docstring of `gui/check.py` |
 | `verilog` | A Verilog top level; needs Riviera-PRO or ModelSim/Questa, so CI doesn't run it | the header of its `run.py` |
 
 ## Running all tests
@@ -39,3 +41,12 @@ later) is reported as not run. See `--help` for all options.
 The `unit` and `fake_vsim` suites don't use the simulator selected, but are run with every simulator. Without `tclsh`,
 `fake_vsim` is reported as skipped, which isn't a failure, and the tests of `unit` which need it are skipped. CI runs
 the same script, one combination per job, with GHDL and NVC.
+
+With Riviera-PRO, `unit` also checks VCST's workaround for the old SQLite Riviera-PRO loads into the simulator, without
+running the simulator (`unit/test_old_sqlite.py`). It needs a Python that links SQLite dynamically, as most do (uv's
+Pythons have it built in), and coverage.py, which it installs from the package index if it isn't installed; otherwise
+it is skipped, saying why. CI checks the same with SQLite 3.25.3 built from source, and every week with the newest
+coverage.py.
+
+The `gui` suite needs an X server, which it finds or starts as its docstring says, possibly building a podman image the
+first time (which needs network access). Without one it is reported as skipped, with the reason, which isn't a failure.
