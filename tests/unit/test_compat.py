@@ -1,6 +1,6 @@
 """
 What VCST gives the simulator's cocotb to embed the Python running VCST, which differs between versions of cocotb,
-while respecting what the user has set.
+while respecting what the user has set, and when cocotb opens the Python debugger, which VCST warns about.
 """
 
 import sys
@@ -8,7 +8,7 @@ import unittest
 from unittest import mock
 
 import vcst.utils.compat as compat
-from vcst.utils.compat import COCOTB2, gpi_environ
+from vcst.utils.compat import COCOTB2, gpi_environ, pdb_on_exception
 
 HAS_ENTRY_POINT = hasattr(compat.cocotb_config, "pygpi_entry_point")
 LIBPYTHON = "/user/libpython.so"
@@ -63,6 +63,30 @@ class GpiEnviron(unittest.TestCase):
             mock.patch.object(sys, "base_prefix", "/usr"),
         ):
             self.assertNotIn("VIRTUAL_ENV", gpi_environ({"LIBPYTHON_LOC": LIBPYTHON}))
+
+
+class PdbOnException(unittest.TestCase):
+    """cocotb 2.1 reads COCOTB_PDB_ON_EXCEPTION as a boolean, earlier versions only check that it is set"""
+
+    def opens(self, version, value):
+        environ = {} if value is None else {"COCOTB_PDB_ON_EXCEPTION": value}
+        with mock.patch.object(compat, "COCOTB_VERSION", version):
+            return pdb_on_exception(environ)
+
+    def test_unset_never_opens_the_debugger(self):
+        for version in ((1, 8), (2, 0), (2, 1)):
+            self.assertFalse(self.opens(version, None))
+
+    def test_before_2_1_any_value_opens_it(self):
+        for version in ((1, 8), (1, 9), (2, 0)):
+            for value in ("1", "0", "false", ""):
+                self.assertTrue(self.opens(version, value), (version, value))
+
+    def test_from_2_1_only_a_true_value_opens_it(self):
+        for value in ("1", "yes", "Y", "on", "TRUE", "enable"):
+            self.assertTrue(self.opens((2, 1), value), value)
+        for value in ("0", "no", "n", "OFF", "False", "disable", "", " "):
+            self.assertFalse(self.opens((2, 1), value), value)
 
 
 if __name__ == "__main__":

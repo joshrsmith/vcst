@@ -56,6 +56,46 @@ class CocoTestBench(TestBench):
         self.discover_cocotb_tests(cocotb_module, cocotb_module_location)
         self.set_attribute(".cocotb", None)
 
+    def set_attribute(self, name, value):
+        """
+        Sets an attribute of the test bench, except run_all_in_same_sim, which is ignored with a warning, as VCST can't
+        honour it.
+        """
+        if name == "run_all_in_same_sim" and self._ignore_run_all_in_same_sim(value):
+            return
+        super().set_attribute(name, value)
+
+    def add_config(self, name, *args, attributes=None, **kwargs):
+        """
+        Adds a configuration, see VUnit's TestBench.add_config, but ignores the attribute run_all_in_same_sim with a
+        warning.
+        """
+        if (
+            attributes
+            and "run_all_in_same_sim" in attributes
+            and self._ignore_run_all_in_same_sim(attributes["run_all_in_same_sim"])
+        ):
+            attributes = {
+                key: value for key, value in attributes.items() if key != "run_all_in_same_sim"
+            }
+        return super().add_config(name, *args, attributes=attributes, **kwargs)
+
+    def _ignore_run_all_in_same_sim(self, value):
+        """
+        Returns whether run_all_in_same_sim is to be ignored, printing a warning: when it is enabled, which VUnit does for
+        a true value and for None, the value of an attribute given without one. VCST runs every cocotb test in a
+        simulator of its own, to select it by name. Passed on to VUnit, the attribute made the configurations added to
+        the test bench afterwards be dropped silently, and an error would stop run scripts that set it on all test
+        benches.
+        """
+        if not (value or value is None):
+            return False
+        print(
+            f"WARNING: run_all_in_same_sim is ignored for the cocotb test bench {self.library_name}.{self.name}: VCST "
+            "runs every cocotb test in a simulator of its own, to select it by name"
+        )
+        return True
+
     def _add_architecture_callback(self):
         """
         Called when architectures have been added

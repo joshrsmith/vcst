@@ -3,8 +3,9 @@ Checks the VCST command line and run script interface, which differs between VUn
 scripts of this directory with different arguments. It checks `from_argv` and `from_args` with and without
 `compile_builtins`, the rejection of unknown options, attribute selection, `--list`, `--export-json`, `--elaborate`,
 random seeds (`--seed`, `--seed repeat` and the `seed` simulation option), `--changed` with changes in the Python
-files of cocotb modules (with VUnit 5), a `COCOTB_TESTCASE` set by the user, tests with the same
-name, cocotb modules with the same file name in different directories and a second cocotb module for a top level.
+files of cocotb modules (with VUnit 5), a `COCOTB_TESTCASE` set by the user, the warning about
+`COCOTB_PDB_ON_EXCEPTION`, the coverage of tests run in parallel, tests with the same name, `run_all_in_same_sim`
+(ignored), cocotb modules with the same file name in different directories and a second cocotb module for a top level.
 
 Usage: python check.py [-p N] [--output-path DIR]
 
@@ -26,7 +27,7 @@ from pathlib import Path
 from vunit import VUnit
 from vunit.test.suites import TestRun
 
-from vcst.utils.compat import COCOTB2, COCOTB_SUPPORTS_NVC
+from vcst.utils.compat import COCOTB2, COCOTB_SUPPORTS_NVC, COCOTB_VERSION
 
 ROOT = Path(__file__).resolve().parent
 # VUnit 5 gives every test a seed, see --seed
@@ -52,10 +53,10 @@ work.mkdir(parents=True, exist_ok=True)
 parallel = ["-p", str(options.num_threads)]
 
 
-def run(name, script, *args, env=None):
+def run(name, script, *args, env=None, cwd=None):
     """
     Runs a run script, returns (exit code, output, {test name: (outcome, output)} from its xunit report). env gives
-    environment variables to set, or to remove with the value None.
+    environment variables to set, or to remove with the value None, cwd the directory to run it in.
     """
     output_path = work / name
     xunit = output_path / "xunit.xml"
@@ -73,7 +74,9 @@ def run(name, script, *args, env=None):
     ]
     run_env = {**os.environ, **(env or {})}
     run_env = {key: value for key, value in run_env.items() if value is not None}
-    proc = subprocess.run(command, capture_output=True, text=True, env=run_env, check=False)
+    proc = subprocess.run(
+        command, capture_output=True, text=True, env=run_env, cwd=cwd, check=False
+    )
     tests = {}
     if xunit.exists():
         for testcase in ET.parse(xunit).getroot().iter("testcase"):
@@ -226,6 +229,122 @@ if COCOTB2:
         rc != 0 and "tests named 'duplicate'" in output and not tests,
         output,
     )
+
+# run_all_in_same_sim can't be honoured, as every cocotb test runs in a simulator of its own, so it is ignored with a
+# warning; passed on to VUnit, it made VUnit drop the configurations added afterwards
+rc, output, tests = run("same_sim", "run_same_sim.py")
+warnings = re.findall(
+    r"^WARNING: run_all_in_same_sim is ignored for the cocotb test bench lib\.front_end_dut",
+    output,
+    re.M,
+)
+check(
+    "run_all_in_same_sim is ignored with a warning for a cocotb test bench, and no configuration is lost",
+    rc == 0
+    and len(warnings) == 3
+    and tests.get("lib.front_end_dut.same_sim.tagged", ("",))[0] == "passed"
+    and tests.get("lib.front_end_dut.after.tagged", ("",))[0] == "passed",
+    output,
+)
+
+# COCOTB_PDB_ON_EXCEPTION hangs the run under VUnit, so VCST warns about it when cocotb would open the debugger: cocotb
+# 2.1 reads it as a boolean, earlier versions only check that it is set
+warning = "COCOTB_PDB_ON_EXCEPTION is set"
+READS_BOOLEAN = COCOTB_VERSION >= (2, 1)
+for value, warned in (
+    ("1", True),
+    ("0", not READS_BOOLEAN),
+    ("False", not READS_BOOLEAN),
+    ("", not READS_BOOLEAN),
+    (None, False),
+):
+    rc, output, _ = run("pdb", "run_from_argv.py", "--list", env={"COCOTB_PDB_ON_EXCEPTION": value})
+    check(
+        f"COCOTB_PDB_ON_EXCEPTION={value!r} {'is warned about' if warned else 'gives no warning'}",
+        rc == 0 and (warning in output) == warned,
+        output,
+    )
+
+# The Python coverage of cocotb tests run in parallel is complete once combined, with the recipe of the README: a data
+# file for each simulator, absolute paths, the data of the previous run erased. Run twice, as a user does, with -p 4
+# whatever -p this script was given. Needs coverage.py: the installed one, or else the newest, installed into the work
+# directory, which needs pip and the package index; the check is skipped if neither works.
+coverage_package = work / "coverage_package"
+has_coverage = subprocess.run(
+    [sys.executable, "-c", "import coverage"], capture_output=True, check=False
+)
+install = subprocess.run(
+    [
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "--quiet",
+        "--target",
+        str(coverage_package),
+        "coverage",
+    ]
+    if has_coverage.returncode != 0
+    else [sys.executable, "-c", ""],
+    capture_output=True,
+    text=True,
+    check=False,
+)
+if install.returncode != 0:
+    print(
+        f"skip coverage checks: coverage.py isn't installed and can't be\n{install.stderr[-500:]}"
+    )
+else:
+    coverage_data = work / "coverage_data"
+    shutil.rmtree(coverage_data, ignore_errors=True)
+    coverage_data.mkdir()
+    rcfile = coverage_data / "coverage.rc"
+    rcfile.write_text(f"[run]\nparallel = True\ndata_file = {coverage_data / '.coverage'}\n")
+    coverage_env = {
+        "COVERAGE_RCFILE": str(rcfile),
+        "PYTHONPATH": os.pathsep.join(
+            filter(None, [str(coverage_package), os.environ.get("PYTHONPATH")])
+        ),
+    }
+    report_file = coverage_data / "report.json"
+
+    def coverage(*args):
+        """Runs coverage.py's command line, returns the output if it failed"""
+        done = subprocess.run(
+            [sys.executable, "-m", "coverage", *args],
+            capture_output=True,
+            text=True,
+            env={**os.environ, **coverage_env},
+            cwd=work,
+            check=False,
+        )
+        return (
+            ""
+            if done.returncode == 0
+            else f"\ncoverage {args[0]} failed:\n{done.stdout}{done.stderr}"
+        )
+
+    for attempt in ("first", "second"):
+        report_file.unlink(missing_ok=True)
+        failed = coverage("erase")
+        rc, output, tests = run(
+            "coverage",
+            "run_from_argv.py",
+            "-p",
+            "4",
+            env={**coverage_env, "COCOTB_USER_COVERAGE" if COCOTB2 else "COVERAGE": "1"},
+            cwd=work,
+        )
+        failed = failed or coverage("combine") or coverage("json", "-o", str(report_file))
+        covered = {}
+        if report_file.exists():
+            for name, data in json.loads(report_file.read_text())["files"].items():
+                covered[Path(name).name] = data["executed_lines"] and not data["missing_lines"]
+        check(
+            f"the coverage of cocotb tests run in parallel is complete with the recipe of the README, {attempt} run",
+            rc == 0 and not failed and covered.get("test_front_end.py"),
+            f"{output}{failed}\n{covered}",
+        )
 
 # Modules with the same file name in different directories are different modules
 rc, output, tests = run("same_names", "run_same_names.py")
